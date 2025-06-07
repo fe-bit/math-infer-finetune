@@ -1,0 +1,3 @@
+[submodule "math-datasets"]
+	path = math-datasets
+	url = https://github.com/fe-bit/math-datasets.git
