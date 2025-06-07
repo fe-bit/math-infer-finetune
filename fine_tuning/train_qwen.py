@@ -8,6 +8,8 @@ import os
 import logging
 import sys
 from pathlib import Path
+from peft import LoraConfig
+
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -45,6 +47,17 @@ training_args = TrainingArguments(
     report_to="none",
 )
 model = TransformerLLM(model_name)
+lora_config = LoraConfig(
+    r=8,
+    lora_alpha=16,
+    lora_dropout=0.01,
+    target_modules=[
+        "q_proj", "k_proj", "v_proj", # "o_proj", 
+        "gate_proj", "up_proj", "down_proj"
+    ],
+    task_type="CAUSAL_LM",
+    bias="lora_only"
+)
 
 print("Starting Training:", model_name)
 ### Training ###
@@ -54,8 +67,8 @@ trainer.train(
     output_dir=output_dir.as_posix(), 
     dataset=TrainingGSM8KPlannerDataset, 
     resume_from_checkpoint=False, 
-    apply_lora=False,
+    lora_config=lora_config,
     training_args=training_args
 )
 
-evaluate(model_name=model_name, output_dir=output_dir.as_posix(), datasets=[SVAMP, GSM8K], first_n=100)
+evaluate(model_name=model_name, output_dir=output_dir.as_posix(), datasets=[SVAMP, GSM8K], first_n=100, with_peft=True)

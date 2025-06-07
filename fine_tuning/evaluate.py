@@ -34,7 +34,7 @@ def evaluate_one(generator: Generate, datasets: list[Dataset], model_name: str, 
         )
 
     
-def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], first_n: int=100):
+def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], first_n: int=100, with_peft: bool=False):
     eval_name_before_training = model_name + "_before_training"
     eval_name_after_training = model_name + "_after_training"
 
@@ -42,12 +42,20 @@ def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], first_n:
         TransformerLLM(model_name),
     ), datasets=datasets, first_n=first_n, model_name=eval_name_before_training)
 
-
-    evaluate_one(generator=LocalGenerator(
-        TransformerLLM.from_trained(model_name=model_name, checkpoint_path=get_latest_checkpoint_dir(output_dir)),
-    ), datasets=datasets, first_n=first_n, model_name=eval_name_before_training)
-
-    
+    if with_peft:
+        evaluate_one(
+            generator=LocalGenerator(
+                model=TransformerLLM(model_name=model_name), 
+                merge_with_peft_dir=get_latest_checkpoint_dir(output_dir)
+            ),
+            datasets=datasets, 
+            first_n=first_n, 
+            model_name=eval_name_before_training
+        )
+    else:
+        evaluate_one(generator=LocalGenerator(
+            TransformerLLM.from_trained(model_name=model_name, checkpoint_path=get_latest_checkpoint_dir(output_dir)),
+        ), datasets=datasets, first_n=first_n, model_name=eval_name_before_training)
 
     ### Evaluation ###
     df = evaluate_all([eval_name_before_training, eval_name_after_training], datasets=datasets, save_dir=output_dir, use_transformated_answers=False)
