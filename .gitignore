@@ -1,0 +1,10 @@
+.env
+env/
+**/jobs/
+**/evaluations/
+*.csv
+*.xlsx
+
+__pycache__/
+*.pyc
+**/training-output/
