@@ -1,5 +1,5 @@
 [project]
-name = "finetune"
+name = "math_infer_finetune"
 version = "0.1.0"
 description = ""
 authors = [
@@ -8,7 +8,6 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "math-datasets @ file:///home/f/felbingerp/MA/finetune/math-datasets",
     "dotenv (>=0.9.9,<0.10.0)",
     "langchain (>=0.3.25,<0.4.0)",
     "langchain-google-genai (>=2.1.5,<3.0.0)",
@@ -17,6 +16,8 @@ dependencies = [
     "trl (>=0.18.1,<0.19.0)"
 ]
 
+[tool.poetry.dependencies]
+math-datasets = { path = "./math-datasets", develop = true }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
