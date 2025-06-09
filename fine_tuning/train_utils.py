@@ -34,7 +34,7 @@ def train(model_name: str, resume: bool = True):
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
         
-        num_train_epochs=5, # we use EarlyStoppingCallback to stop training if eval_loss doesn't improve for 3 evals
+        num_train_epochs=1, # we use EarlyStoppingCallback to stop training if eval_loss doesn't improve for 3 evals
 
         logging_steps=25,
 
