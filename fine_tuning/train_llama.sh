@@ -4,14 +4,14 @@
 #SBATCH -o ./fine_tuning/jobs/train/llama/%x.%j.out
 #SBATCH -e ./fine_tuning/jobs/train/llama/%x.%j.err
 #SBATCH -D ./
-#SBATCH --time=12:30:00
+#SBATCH --time=16:30:00
 #SBATCH --partition=AMD
 #SBATCH --comment=""
 
-export OMP_NUM_THREADS=32
-export MKL_NUM_THREADS=32
-export NUMEXPR_NUM_THREADS=32
-export SLURM_CPUS_PER_TASK=32
+export OMP_NUM_THREADS=16
+export MKL_NUM_THREADS=16
+export NUMEXPR_NUM_THREADS=16
+export SLURM_CPUS_PER_TASK=16
 
 source env/bin/activate
 python3 fine_tuning/train.py meta-llama/Llama-3.2-1B-Instruct

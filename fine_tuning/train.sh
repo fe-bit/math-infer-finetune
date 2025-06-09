@@ -1,8 +1,8 @@
 #!/bin/bash
 # sbatch ./fine_tuning/train.sh
 #SBATCH --job-name=MA-Train
-#SBATCH -o ./fine_tuning/jobs/train/%x.%j.out
-#SBATCH -e ./fine_tuning/jobs/train/%x.%j.err
+#SBATCH -o ./fine_tuning/jobs/train/smolm360/%x.%j.out
+#SBATCH -e ./fine_tuning/jobs/train/smolm360/%x.%j.err
 #SBATCH -D ./
 #SBATCH --time=12:30:00
 #SBATCH --partition=All

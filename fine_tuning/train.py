@@ -9,6 +9,10 @@ import pandas as pd
 import torch
 from trl import SFTTrainer, SFTConfig
 import argparse
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 logging.basicConfig(
@@ -30,7 +34,6 @@ def parse_args():
         "--resume",
         action="store_true",
         help="Resume training from the latest checkpoint.",
-        default=True
     )
     # Add more arguments here as needed (batch size, epochs, etc.)
     return parser.parse_args()
@@ -77,7 +80,7 @@ training_args = TrainingArguments(
     per_device_train_batch_size=1,
     gradient_accumulation_steps=8,
     
-    num_train_epochs=1, # we use EarlyStoppingCallback to stop training if eval_loss doesn't improve for 3 evals
+    num_train_epochs=8, # we use EarlyStoppingCallback to stop training if eval_loss doesn't improve for 3 evals
 
     logging_steps=25,
 
@@ -126,14 +129,6 @@ else:
     print(f"PyTorch using {torch.get_num_threads()} CPU threads.")
     device_map_strategy = "cpu"
 
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    device_map=device_map_strategy,
-    trust_remote_code=True,
-)
-
-
 
 training_args = SFTConfig(packing=True, **training_args.to_dict())
 os.makedirs(output_dir, exist_ok=True)
@@ -141,7 +136,7 @@ with open(f"{output_dir}/training_args.json", "w") as f:
     f.write(training_args.to_json_string())
 
 trainer = SFTTrainer(
-    model=model,
+    model=model_name,
     args=training_args,
     peft_config=lora_config, # is None if not using LoRA
     train_dataset=ds["train"],

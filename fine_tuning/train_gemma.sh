@@ -1,8 +1,8 @@
 #!/bin/bash
-# sbatch ./fine_tuning/train_qwen.sh
-#SBATCH --job-name=MA-Train-Qwen
-#SBATCH -o ./fine_tuning/jobs/train/qwen/%x.%j.out
-#SBATCH -e ./fine_tuning/jobs/train/qwen/%x.%j.err
+# sbatch ./fine_tuning/train_gemma.sh
+#SBATCH --job-name=MA-Train-Gemma
+#SBATCH -o ./fine_tuning/jobs/train/gemma/%x.%j.out
+#SBATCH -e ./fine_tuning/jobs/train/gemma/%x.%j.err
 #SBATCH -D ./
 #SBATCH --time=16:30:00
 #SBATCH --partition=AMD
@@ -14,4 +14,4 @@ export NUMEXPR_NUM_THREADS=16
 export SLURM_CPUS_PER_TASK=16
 
 source env/bin/activate
-python3 fine_tuning/train.py Qwen/Qwen2.5-0.5B-Instruct
+python3 fine_tuning/train.py google/gemma-3-1b-it
