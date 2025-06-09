@@ -33,7 +33,7 @@ training_args = TrainingArguments(
     output_dir=output_dir.as_posix(),
     per_device_train_batch_size=1,
     gradient_accumulation_steps=8,  # More accumulation for better effective batch size
-    num_train_epochs=15,             # More epochs helps for GSM8K
+    num_train_epochs=5,             # More epochs helps for GSM8K
     learning_rate=5e-5,             # Slightly higher; LoRA is robust to this
     warmup_steps=20,               # Helps stabilize training
     weight_decay=0.01,              # Adds regularization
@@ -46,7 +46,7 @@ training_args = TrainingArguments(
     logging_dir="./logs",
     report_to="none",
 )
-model = TransformerLLM(model_name)
+# model = TransformerLLM(model_name)
 lora_config = LoraConfig(
     r=8,
     lora_alpha=16,
@@ -59,16 +59,16 @@ lora_config = LoraConfig(
     bias="lora_only"
 )
 
-print("Starting Training:", model_name)
-### Training ###
-trainer = CustomTrainer()
-trainer.train(
-    llm=model, 
-    output_dir=output_dir.as_posix(), 
-    dataset=TrainingGSM8KPlannerDataset, 
-    resume_from_checkpoint=False, 
-    lora_config=lora_config,
-    training_args=training_args
-)
+# print("Starting Training:", model_name)
+# ### Training ###
+# trainer = CustomTrainer()
+# trainer.train(
+#     llm=model, 
+#     output_dir=output_dir.as_posix(), 
+#     dataset=TrainingGSM8KPlannerDataset, 
+#     resume_from_checkpoint=True, 
+#     lora_config=lora_config,
+#     training_args=training_args
+# )
 
-evaluate(model_name=model_name, output_dir=output_dir.as_posix(), datasets=[SVAMP, GSM8K], first_n=100, with_peft=True)
+evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=[SVAMP, GSM8K], first_n=100, checkpoint_dir=output_dir.as_posix())
