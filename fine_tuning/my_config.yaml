@@ -1,0 +1,32 @@
+task: llm-sft
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+project_name: autotrain-qwen-finetune
+log: none
+backend: local
+
+data:
+  path: openai/gsm8k
+  train_split: main:train
+  valid_split: null
+  chat_template: none
+  column_mapping:
+    prompt_text_column: question
+    text_column: answer
+
+params:
+  block_size: 2048
+  model_max_length: 4096
+  epochs: 2
+  batch_size: 1
+  lr: 2e-5
+  peft: true
+  lora_r: 4
+  lora_alpha: 8
+  lora_dropout: 0.05
+  target_modules: all-linear
+  padding: right
+  optimizer: adamw_torch
+  scheduler: linear
+  gradient_accumulation: 8
+  merge_adapter: true
+  quantization: none
