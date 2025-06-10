@@ -1,7 +1,8 @@
 from math_datasets.generators import Generate, generate_responses, TransformersGenerate
-from math_datasets.datasets import Dataset
+from math_datasets.datasets import Dataset, GSM8K, SVAMP
 from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
 from math_datasets.evaluator import evaluate_all
+from pathlib import Path
 
 
 def evaluate_one(generator: Generate, datasets: list[Dataset], model_name: str, save_dir: str, first_n: int=100, overwrite: bool=False):
@@ -56,3 +57,11 @@ def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], checkpoi
     ### Evaluation ###
     df = evaluate_all([eval_name_before_training, eval_name_after_training], datasets=datasets, save_dir=output_dir, use_transformated_answers=False, use_first_n=first_n)
     print(df)
+
+
+if __name__:
+    SAVE_DIR = Path(__file__).parent
+    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    output_dir = SAVE_DIR / f"training-output/{model_name}"
+    datasets = [SVAMP, GSM8K]
+    evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=datasets, first_n=50, checkpoint_dir=output_dir.as_posix(), with_peft=False)
