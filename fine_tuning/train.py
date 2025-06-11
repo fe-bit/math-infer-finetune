@@ -4,16 +4,14 @@ import logging
 import sys
 from pathlib import Path
 from peft import LoraConfig
-from datasets import Dataset as HFDataset
+from datasets import Dataset as HFDataset, load_dataset
 import pandas as pd
 import torch
 from trl import SFTTrainer, SFTConfig
 import argparse
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -21,6 +19,14 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     force=True  # Overwrites previous configs
 )
+
+# Add at the top of your train.py, before model loading
+if 'LOCAL_RANK' in os.environ:
+    local_rank = int(os.environ['LOCAL_RANK'])
+    torch.cuda.set_device(local_rank)
+    device = torch.device(f'cuda:{local_rank}')
+else:
+    device = torch.device('cuda:0')
 
 
 def parse_args():
@@ -35,12 +41,18 @@ def parse_args():
         action="store_true",
         help="Resume training from the latest checkpoint.",
     )
+    parser.add_argument(
+        "--trainingeval",
+        action="store_true",
+        help="Eval during training.",
+    )
     # Add more arguments here as needed (batch size, epochs, etc.)
     return parser.parse_args()
 
 args = parse_args()
 model_name = args.model_name
 resume = args.resume
+training_eval = args.trainingeval
 
 WORKING_DIR = Path(__file__).parent
 output_dir = WORKING_DIR / f"training-output/{model_name}"
@@ -50,6 +62,7 @@ print(f"Output directory: {output_dir}")
 print(f"Resume from checkpoint: {resume}")
 
 def get_dataset():
+    return load_dataset("openai/gsm8k", "main")
     p = WORKING_DIR / "train_data.xlsx"
     df = pd.read_excel(p)
     df = df.dropna(axis=0)
@@ -61,8 +74,8 @@ ds = get_dataset()
 
 def format_dataset(ds):
     def format_chat(example):
-        user_message = example["input"]
-        assistant_message = example["output"]
+        user_message = example["question"] #example["input"]
+        assistant_message = example["answer"] #example["output"]
         messages = [
             {"role": "user", "content": user_message},
             {"role": "assistant", "content": assistant_message}
@@ -75,43 +88,6 @@ def format_dataset(ds):
 
 ds = format_dataset(ds)
 
-training_args = TrainingArguments(
-    output_dir=output_dir.as_posix(),
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=8,
-    
-    num_train_epochs=8, # we use EarlyStoppingCallback to stop training if eval_loss doesn't improve for 3 evals
-
-    logging_steps=25,
-
-    save_strategy="steps",
-    save_steps=100,
-
-    save_total_limit=2,
-    eval_strategy="steps",
-    eval_steps=100,
-
-    load_best_model_at_end=True,
-    metric_for_best_model="eval_loss",
-    greater_is_better=False,
-
-    logging_dir="./logs",
-    report_to="none",
-)
-
-
-lora_config = LoraConfig(
-    r=4,
-    lora_alpha=8,
-    lora_dropout=0.05,
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj", 
-        "gate_proj", "up_proj", "down_proj"
-    ],
-    task_type="CAUSAL_LM",
-    bias="lora_only",
-    modules_to_save=["lm_head", "embed_token"],
-)
 
 if torch.cuda.is_available():
     print("CUDA is available! Using GPU.")
@@ -129,19 +105,43 @@ else:
     print(f"PyTorch using {torch.get_num_threads()} CPU threads.")
     device_map_strategy = "cpu"
 
+# Add these memory-saving parameters to your training configuration
+training_args = SFTConfig(
+    output_dir=output_dir.as_posix(),
+    num_train_epochs=8,
+    per_device_train_batch_size=1,
+    per_device_eval_batch_size=1,         
+    gradient_accumulation_steps=16,
+    gradient_checkpointing=True,          
+    dataloader_pin_memory=False,          
+    max_seq_length=512,
+    packing=True,
+    logging_steps=10,
+    save_steps=500,
+    eval_steps=500,
+    warmup_steps=10,
+    learning_rate=5e-5,
+    fp16=True,                           
+    remove_unused_columns=False,
+    dataloader_num_workers=0,             
+    eval_strategy="no",
+    save_strategy="no",
+)
 
-training_args = SFTConfig(packing=True, **training_args.to_dict())
-os.makedirs(output_dir, exist_ok=True)
-with open(f"{output_dir}/training_args.json", "w") as f:
-    f.write(training_args.to_json_string())
+lora_config = LoraConfig(
+    r=8,                    # Reduce from 16 to 8
+    lora_alpha=16,          # Reduce accordingly
+    target_modules=["q_proj", "v_proj"],  # Reduce target modules
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+)
 
 trainer = SFTTrainer(
     model=model_name,
     args=training_args,
-    peft_config=lora_config, # is None if not using LoRA
+    peft_config=lora_config,
     train_dataset=ds["train"],
-    eval_dataset=ds["test"],
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
 )
 
 if resume:
