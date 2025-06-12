@@ -6,31 +6,20 @@
 #SBATCH -D ./
 #SBATCH --time=6:30:00
 #SBATCH --partition=NvidiaAll
-#SBATCH --nodes=2
+#SBATCH --nodes=1                # Use only 1 node for now
+#SBATCH --ntasks-per-node=1      # Use only 1 GPU for now
+#SBATCH --cpus-per-task=8
 #SBATCH --comment=""
 
 export TMPDIR=$HOME/tmp
 mkdir -p $TMPDIR
 
+# Add aggressive memory optimization
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+export CUDA_LAUNCH_BLOCKING=0
+
 source env/bin/activate
 
-MASTER_ADDR=$(scontrol show hostname $SLURM_NODELIST | head -n1)
-MASTER_PORT=12345
-export PYTHONUNBUFFERED=1
-
-export MASTER_ADDR
-export MASTER_PORT
-export WORLD_SIZE=2
-export RANK=$SLURM_PROCID
-
-# accelerate launch --multi_gpu autotrain --config ./fine_tuning/my_config.yaml
-# accelerate launch \
-#   --multi_gpu \
-#   --num_machines $SLURM_JOB_NUM_NODES \
-#   --machine_rank $SLURM_PROCID \
-#   --main_process_ip $(scontrol show hostname $SLURM_NODELIST | head -n1) \
-#   --main_process_port 12345 \
-#   autotrain --config ./fine_tuning/my_config.yaml
-
-
-accelerate launch --multi_gpu --num_processes $WORLD_SIZE --main_process_ip $MASTER_ADDR --main_process_port $MASTER_PORT autotrain --config ./fine_tuning/my_config.yaml
+# For single GPU training, no need for distributed setup
+python ./fine_tuning/train.py Qwen/Qwen2.5-0.5B-Instruct
+python3 fine_tuning/evaluate.py --model-name Qwen/Qwen2.5-0.5B-Instruct

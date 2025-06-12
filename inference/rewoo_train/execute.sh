@@ -4,8 +4,8 @@
 #SBATCH -o ./inference/rewoo_train/jobs/%x.%j.out
 #SBATCH -e ./inference/rewoo_train/jobs/%x.%j.err
 #SBATCH -D ./
-#SBATCH --time=10:30:00
-#SBATCH --partition=AMD
+#SBATCH --time=0:30:00
+#SBATCH --partition=NvidiaAll
 #SBATCH --comment=""
 
 source env/bin/activate
