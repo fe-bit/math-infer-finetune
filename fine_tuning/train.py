@@ -62,40 +62,30 @@ print(f"Output directory: {output_dir}")
 print(f"Resume from checkpoint: {resume}")
 
 def get_dataset():
-    return load_dataset("openai/gsm8k", "main")
-    p = WORKING_DIR / "train_data.xlsx"
-    df = pd.read_excel(p)
-    df = df.dropna(axis=0)
-    ds = HFDataset.from_pandas(df)
+    # return load_dataset("openai/gsm8k", "main")
+    p = WORKING_DIR / "train_data.jsonl"
+    ds = load_dataset("json", data_files=p.as_posix(), split="train")
     ds = ds.train_test_split(test_size=0.1, seed=42)
     return ds
 
 ds = get_dataset()
-
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.pad_token = tokenizer.eos_token  # Set pad token to eos token if not already set
 
 def format_dataset(ds):
     def format_chat(example):
         user_message = example["question"] #example["input"]
         assistant_message = example["answer"] #example["output"]
         messages = [
+            {"role": "system", "content": "You are a math professor."},
             {"role": "user", "content": user_message},
             {"role": "assistant", "content": assistant_message}
         ]
-        m = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            return_tensors=None
-        )
         return {
-            "text": m
+            "messages": messages
         }
     ds = ds.map(format_chat, batched=False)
     return ds
 
-ds = format_dataset(ds)
+# ds = format_dataset(ds)
 
 
 if torch.cuda.is_available():
@@ -104,57 +94,50 @@ if torch.cuda.is_available():
     print(f"Current CUDA device: {torch.cuda.current_device()}")
     print(f"Device name: {torch.cuda.get_device_name(0)}")
     device_map_strategy = "cuda"
+    precision_str = "float16"
 elif torch.backends.mps.is_available():
     print("MPS (Metal Performance Shaders) is available! Using Apple Silicon GPU.")
     device_map_strategy = "mps"
+    precision_str = "bfloat16"
 else:
     print("CUDA is not available. Using CPU.")
     num_threads = int(os.environ.get("SLURM_CPUS_PER_TASK", 1)) # Default to 1 if not in Slurm
     torch.set_num_threads(num_threads)
     print(f"PyTorch using {torch.get_num_threads()} CPU threads.")
     device_map_strategy = "cpu"
+    precision_str = "float32"
 
-# Add these memory-saving parameters to your training configuration
 training_args = SFTConfig(
+    model_init_kwargs={
+        "torch_dtype": precision_str,
+        "device_map": device_map_strategy,
+    },
     output_dir=output_dir.as_posix(),
-    num_train_epochs=8,
-    per_device_train_batch_size=1,
-    per_device_eval_batch_size=1,         
-    gradient_accumulation_steps=16,
-    gradient_checkpointing=True,          
-    dataloader_pin_memory=False,          
-    max_seq_length=512,
-    packing=True,
-    logging_steps=10,
-    save_steps=500,
-    eval_steps=500,
-    warmup_steps=10,
-    learning_rate=5e-5,
-    fp16=True,                           
-    remove_unused_columns=False,
-    dataloader_num_workers=0,             
+    num_train_epochs=3,
+    per_device_train_batch_size=1,       
+    gradient_accumulation_steps=8,
+    gradient_checkpointing=True,                  
+    packing=False,
+    logging_steps=100,    
+    
+    save_strategy="steps",
+    save_steps=200,
     eval_strategy="no",
-    save_strategy="no",
-    dataset_text_field="text"
 )
 
-lora_config = LoraConfig(
-    r=4,                    # Reduce from 16 to 8
-    lora_alpha=8,          # Reduce accordingly
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj", 
-        "gate_proj", "up_proj", "down_proj"
-    ],
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
     lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM",
+    target_modules="all-linear",
     modules_to_save=["lm_head", "embed_token"],
+    task_type="CAUSAL_LM",
 )
 
 trainer = SFTTrainer(
     model=model_name,
     args=training_args,
-    peft_config=lora_config,
+    peft_config=peft_config,
     train_dataset=ds["train"],
 )
 
