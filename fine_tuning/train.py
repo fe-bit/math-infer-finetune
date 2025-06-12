@@ -72,6 +72,9 @@ def get_dataset():
 
 ds = get_dataset()
 
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer.pad_token = tokenizer.eos_token  # Set pad token to eos token if not already set
+
 def format_dataset(ds):
     def format_chat(example):
         user_message = example["question"] #example["input"]
@@ -80,8 +83,14 @@ def format_dataset(ds):
             {"role": "user", "content": user_message},
             {"role": "assistant", "content": assistant_message}
         ]
+        m = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            return_tensors=None
+        )
         return {
-            "messages": messages
+            "text": m
         }
     ds = ds.map(format_chat, batched=False)
     return ds
@@ -126,15 +135,20 @@ training_args = SFTConfig(
     dataloader_num_workers=0,             
     eval_strategy="no",
     save_strategy="no",
+    dataset_text_field="text"
 )
 
 lora_config = LoraConfig(
-    r=8,                    # Reduce from 16 to 8
-    lora_alpha=16,          # Reduce accordingly
-    target_modules=["q_proj", "v_proj"],  # Reduce target modules
+    r=4,                    # Reduce from 16 to 8
+    lora_alpha=8,          # Reduce accordingly
+    target_modules=[
+        "q_proj", "k_proj", "v_proj", "o_proj", 
+        "gate_proj", "up_proj", "down_proj"
+    ],
     lora_dropout=0.05,
     bias="none",
     task_type="CAUSAL_LM",
+    modules_to_save=["lm_head", "embed_token"],
 )
 
 trainer = SFTTrainer(
