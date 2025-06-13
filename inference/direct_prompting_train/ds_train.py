@@ -26,7 +26,6 @@ def format_chat(example):
     user_message = example["input"]
     assistant_message = example["output"]
     messages = [
-        {"role": "system", "content": "You are a math professor."},
         {"role": "user", "content": user_message},
         {"role": "assistant", "content": assistant_message}
     ]
@@ -48,6 +47,7 @@ if __name__ == "__main__":
     # shuffle the training data
     df_train = df_train.sample(frac=1, random_state=42).reset_index(drop=True)
     df_train["messages"] = df_train.apply(format_chat, axis=1)
+    df_train = df_train[["messages"]]
     print(df_train.head())
     df_train.to_json(Path(SAVE_DIR) / "train_data.jsonl", orient="records", lines=True)
     df_train.to_excel(Path(SAVE_DIR) / "train_data.csv", index=False)
