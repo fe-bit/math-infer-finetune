@@ -13,7 +13,8 @@ load_dotenv(override=True)
 SAVE_DIR = Path(__file__).parent.as_posix()
 
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
+    "gemma-3-27b-it",
+    # "gemini-2.0-flash",
 ]
 
 
@@ -32,10 +33,10 @@ class ReWOOGeminiModelGenerate(Generate):
                 return resp[-1]["solve"]["result"]
             except Exception as e:
                 print(f"Error: {e}")
-                t = 300
+                t = 60
                 print(f"Retrying in {t + self.sleep_time} seconds...")
                 counter += 1
-                if counter > 5:
+                if counter > 1:
                     entry["model_history"] = "Error occured."
                     return "Error occured."
                 print("Counter:", counter)
@@ -48,7 +49,7 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
             generate_responses(
                 dataset, 
                 model_name=model_name, 
-                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=15), sleep_time=30), 
+                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=2), sleep_time=4), 
                 save_dir=SAVE_DIR, 
                 first_n=first_n,
                 dataset_split=dataset_split
@@ -58,7 +59,7 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
 
 if __name__ == "__main__":
     datasets = [SVAMP, GSM8K]
-    first_n = 450
+    first_n = None
     
     generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="train")
     

@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import messages_to_dict
 import time
 
+
 class ReWOO(TypedDict):
     task: str
     plan_string: str
@@ -111,7 +112,6 @@ Task: {task}"""
             except Exception as e:
                 result = f"Error: {e}"
         elif tool == "LLM":
-            print(tool_input)
             result = self.model.invoke(tool_input)
             _results[step_name] = str(result)
             return {"result": result.content, "message": messages_to_dict([result])}
