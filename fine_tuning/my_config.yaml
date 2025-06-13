@@ -1,6 +1,6 @@
 task: llm-sft
 base_model: Qwen/Qwen2.5-0.5B-Instruct
-project_name: autotrain-qwen-finetune
+project_name: autotrain-gemma-finetune
 log: none
 backend: local
 
