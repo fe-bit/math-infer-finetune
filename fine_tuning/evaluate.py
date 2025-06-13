@@ -3,7 +3,7 @@ from math_datasets.datasets import Dataset, GSM8K, SVAMP
 from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
 from math_datasets.evaluator import evaluate_all
 from pathlib import Path
-
+import argparse
 
 def evaluate_one(generator: Generate, datasets: list[Dataset], model_name: str, save_dir: str, first_n: int=100, overwrite: bool=False):
     for dataset in datasets:
@@ -60,8 +60,20 @@ def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], checkpoi
 
 
 if __name__:
+    parser = argparse.ArgumentParser(description="Evaluate model performance before and after training")
+    parser.add_argument("--model-name", type=str, default="Qwen/Qwen2.5-0.5B-Instruct", 
+                       help="Name of the model to evaluate (default: Qwen/Qwen2.5-0.5B-Instruct)")
+    parser.add_argument("--first-n", type=int, default=50,
+                       help="Number of samples to evaluate (default: 50)")
+    parser.add_argument("--with-peft", action="store_true", default=False,
+                       help="Whether to use PEFT for fine-tuning")
+    args = parser.parse_args()
+
     SAVE_DIR = Path(__file__).parent
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    model_name = args.model_name
     output_dir = SAVE_DIR / f"training-output/{model_name}"
+
+    print("Using model:", model_name)
+    print("With Peft:", args.with_peft)
     datasets = [SVAMP, GSM8K]
-    evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=datasets, first_n=50, checkpoint_dir=output_dir.as_posix(), with_peft=False)
+    evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=datasets, first_n=args.first_n, checkpoint_dir=output_dir.as_posix(), with_peft=args.with_peft)
