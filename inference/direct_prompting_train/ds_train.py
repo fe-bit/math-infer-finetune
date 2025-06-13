@@ -20,7 +20,6 @@ GEMINI_MODELS = [
     "gemini-2.0-flash",
 ]
 
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
 
 def format_chat(example):
     user_message = example["input"]
@@ -30,12 +29,6 @@ def format_chat(example):
         {"role": "assistant", "content": assistant_message}
     ]
     return messages
-    chat_messages = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False, # Don't tokenize into IDs yet
-        add_special_tokens=False # Apply model's specific start/end tokens, e.g., <s> and </s>
-    )
-    return chat_messages
 
 if __name__ == "__main__":
     datasets = [GSM8K, SVAMP]
