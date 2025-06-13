@@ -14,4 +14,4 @@ export NUMEXPR_NUM_THREADS=16
 export SLURM_CPUS_PER_TASK=16
 
 source env/bin/activate
-python3 fine_tuning/train.py google/gemma-3-1b-it
+python3 fine_tuning/train.py google/gemma-3-1b-it --resume

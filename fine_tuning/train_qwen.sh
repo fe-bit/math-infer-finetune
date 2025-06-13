@@ -4,14 +4,16 @@
 #SBATCH -o ./fine_tuning/jobs/train/qwen/%x.%j.out
 #SBATCH -e ./fine_tuning/jobs/train/qwen/%x.%j.err
 #SBATCH -D ./
-#SBATCH --time=16:30:00
-#SBATCH --partition=AMD
+#SBATCH --time=10:30:00
+#SBATCH --partition=NvidiaAll
 #SBATCH --comment=""
 
 export OMP_NUM_THREADS=16
 export MKL_NUM_THREADS=16
 export NUMEXPR_NUM_THREADS=16
 export SLURM_CPUS_PER_TASK=16
+
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 source env/bin/activate
 python3 fine_tuning/train.py Qwen/Qwen2.5-0.5B-Instruct

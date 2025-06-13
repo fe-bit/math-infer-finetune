@@ -1,11 +1,12 @@
 #!/bin/bash
+# sbatch ./fine_tuning/evaluate.sh
 #SBATCH --job-name=MA-Evaluate
-#SBATCH -o ./jobs/evaluate/%x.%j.out
-#SBATCH -e ./jobs/evaluate/%x.%j.err
+#SBATCH -o ./fine_tuning/jobs/evaluate/%x.%j.out
+#SBATCH -e ./fine_tuning/jobs/evaluate/%x.%j.err
 #SBATCH -D ./
 #SBATCH --time=02:00:00
-#SBATCH --partition=AMD
+#SBATCH --partition=NvidiaAll
 #SBATCH --comment=""
 
 source env/bin/activate
-python3 evaluate.py
+python3 fine_tuning/evaluate.py --model-name Qwen/Qwen2.5-0.5B-Instruct

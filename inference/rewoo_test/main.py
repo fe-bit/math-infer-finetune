@@ -9,16 +9,13 @@ from math_datasets.fine_tuning.llm import TransformerLLM
 import time
 from rewoo import ReWOOGeminiModel
 from rewoo_local import ReWOOLocalModel
-import torch
-
 
 load_dotenv(override=True)
 
 SAVE_DIR = Path(__file__).parent.as_posix()
 
 GEMINI_MODELS = [
-    "gemma-3-27b-it",
-    # "gemini-2.0-flash",
+    "gemini-2.0-flash",
 ]
 
 TRANSFORMER_MODELS = [
@@ -40,13 +37,14 @@ class ReWOOGeminiModelGenerate(Generate):
                 return resp[-1]["solve"]["result"]
             except Exception as e:
                 print(f"Error: {e}")
-                print(f"Retrying in {2*self.sleep_time} seconds...")
+                t = 300
+                print(f"Retrying in {t + self.sleep_time} seconds...")
                 counter += 1
-                if counter > 1:
+                if counter > 5:
                     entry["model_history"] = "Error occured."
                     return "Error occured."
                 print("Counter:", counter)
-                time.sleep(2*self.sleep_time)
+                time.sleep(t + self.sleep_time)
 
 
 def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
@@ -55,7 +53,7 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
             generate_responses(
                 dataset, 
                 model_name=model_name, 
-                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=2), sleep_time=4), 
+                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=15), sleep_time=30), 
                 save_dir=SAVE_DIR, 
                 first_n=first_n,
                 dataset_split=dataset_split
@@ -78,11 +76,10 @@ def generate_responses_for_local_models(datasets: List[Dataset], model_names: Li
 
 if __name__ == "__main__":
     datasets = [SVAMP, GSM8K]
-    first_n = None
+    first_n = 100
     
-    # generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="train")
-
-    generate_responses_for_local_models(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="train")
+    # generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="test")
+    generate_responses_for_local_models(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="test")
     
     df = evaluate_all(GEMINI_MODELS + TRANSFORMER_MODELS, datasets, save_dir=SAVE_DIR, use_transformated_answers=False)
     print(df)
