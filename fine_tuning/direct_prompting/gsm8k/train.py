@@ -1,4 +1,4 @@
-from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM, EarlyStoppingCallback
+from transformers import AutoTokenizer, EarlyStoppingCallback
 import os
 import logging
 import sys
@@ -10,6 +10,7 @@ import torch
 from trl import SFTTrainer, SFTConfig
 import argparse
 from dotenv import load_dotenv
+from math_datasets.fine_tuning.metrics.compute_metrics import get_compute_metrics
 
 load_dotenv()
 
@@ -46,17 +47,17 @@ print(f"Output directory: {output_dir}")
 print(f"Resume from checkpoint: {resume}")
 
 def get_dataset():
-    # return load_dataset("openai/gsm8k", "main")
-    p = WORKING_DIR / "train_data.jsonl"
-    ds = load_dataset("json", data_files=p.as_posix(), split="train")
-    ds = ds.train_test_split(test_size=0.1, seed=42)
-    return ds
+    return load_dataset("openai/gsm8k", "main")
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 def format_chat(example):
+    messages = [
+        {"role": "user", "content": example["question"]},
+        {"role": "assistant", "content": example["answer"]}
+    ]
     chat_messages = tokenizer.apply_chat_template(
-        example["messages"],
+        messages,
         tokenize=False, # Don't tokenize into IDs yet
         add_special_tokens=False # Apply model's specific start/end tokens, e.g., <s> and </s>
     )
@@ -65,7 +66,6 @@ def format_chat(example):
 
 ds = get_dataset()
 ds = ds.map(format_chat, batched=False)
-
 print(ds)
 
 if torch.cuda.is_available():
@@ -98,8 +98,8 @@ training_args = SFTConfig(
         "device_map": device_map_strategy,
     },
     output_dir=output_dir.as_posix(),
-    num_train_epochs=5,
-    learning_rate=5e-6,
+    num_train_epochs=3,
+    learning_rate=2e-6,
     
     # memory specific settings
     per_device_train_batch_size=1,    
@@ -111,25 +111,30 @@ training_args = SFTConfig(
 
     # save settings
     save_strategy="steps",
-    save_steps=100,
+    save_steps=200,
     save_total_limit=2,
     logging_steps=50, 
     
     # evaluation settings
     eval_strategy="steps",
-    eval_steps=100,
+    eval_steps=200,
     load_best_model_at_end=True,
     metric_for_best_model="eval_loss",
     greater_is_better=False,
 
     dataset_text_field="text",
+    
     max_grad_norm=1.0,
+    weight_decay=0.01,
+    warmup_ratio=0.1,
+    lr_scheduler_type="linear"
 )
 
 peft_config = LoraConfig(
     r=16,
     lora_alpha=32,
     lora_dropout=0.05,
+    # target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
     target_modules=["q_proj", "v_proj"],
     modules_to_save=["lm_head", "embed_token"],
     task_type="CAUSAL_LM",
@@ -141,6 +146,8 @@ trainer = SFTTrainer(
     peft_config=peft_config,
     train_dataset=ds["train"],
     eval_dataset=ds["test"],
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+    # compute_metrics=get_compute_metrics(tokenizer),
 )
 
 if resume:
