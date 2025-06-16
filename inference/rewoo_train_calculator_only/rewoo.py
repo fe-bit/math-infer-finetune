@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import messages_to_dict
 import time
 
+
 class ReWOO(TypedDict):
     task: str
     plan_string: str
@@ -35,20 +36,25 @@ For each step, choose **one tool** to retrieve or calculate the necessary inform
 The tool output should be stored in a variable like #E1, #E2, etc., which can be used in later steps.
 
 Tools available:
-(1) LLM[input]: A pretrained language model like yourself. Use this to reason through parts of the problem using general knowledge or logic. Input can be a natural language instruction.
-(2) Calculator[input]: Use this for basic arithmetic operations (e.g., addition, subtraction, multiplication, division). Input must be a valid math expression like "290 / 2".
+(1) Calculator[input]: Use this for basic arithmetic operations (e.g., addition, subtraction, multiplication, division). Input must be a valid math expression like "290 / 2".
 
 **Do not solve the problem directly. Only write the plan and tool inputs.**  
 Each step must follow this format:
 Plan: [describe the reasoning for the step] #EX = Tool[tool input]
 
-Example:
+---
+Begin!  
+Describe your plans with rich details. Each Plan must be followed by exactly one #E.
 
-Task: Marco and his dad went strawberry picking. Marco's dad's strawberries weighed 11 pounds. If together their strawberries weighed 30 pounds, how much did Marco's strawberries weigh?  
-Plan: Subtract the dad’s weight from the total to find Marco’s weight. #E1 = Calculator[30 - 11]
+Task: Tina makes $18.00 an hour.  If she works more than 8 hours per shift, she is eligible for overtime, which is paid by your hourly wage + 1/2 your hourly wage.  If she works 10 hours every day for 5 days, how much money does she make?
 
-Task: Frank was reading through his favorite book. The book had 3 chapters, each with the same number of pages. It has a total of 594 pages. How many pages are in each chapter?  
-Plan: Divide the total number of pages by the number of chapters. #E1 = Calculator[594 / 3]
+Good example:
+Plan: First, calculate Tina's overtime wage. This is her regular wage plus half of her regular wage. #E1 = Calculator[18 + (18 / 2)]
+Plan: Next, determine how many overtime hours Tina works each day. She works 10 hours and is eligible for overtime after 8, so we need to find the difference. #E2 = Calculator[10 - 8]
+Plan: Now, calculate Tina's daily overtime pay. Multiply her overtime wage by the number of overtime hours she works each day. #E3 = Calculator[#E1 * #E2]
+Plan: Calculate Tina's regular pay each day. Multiply her regular hourly wage by the number of regular hours she works (8 hours). #E4 = Calculator[18 * 8]
+Plan: Calculate Tina's total daily pay. Add her regular pay and her overtime pay for each day. #E5 = Calculator[#E3 + #E4]
+Plan: Finally, calculate Tina's total earnings for the week. Multiply her total daily pay by the number of days she works (5 days). #E6 = Calculator[#E5 * 5]
 
 ---
 
@@ -110,39 +116,18 @@ Task: {task}"""
                 result = f"SymPy Error: {e}"
             except Exception as e:
                 result = f"Error: {e}"
-        elif tool == "LLM":
-            print(tool_input)
-            result = self.model.invoke(tool_input)
-            _results[step_name] = str(result)
-            return {"result": result.content, "message": messages_to_dict([result])}
         else:
             raise ValueError
         _results[step_name] = str(result)
         return {"results": _results}
 
     def solve(self, state: ReWOO):
-        solve_prompt = """Solve the following task or problem. To solve the problem, we have made a step-by-step Plan and \
-retrieved corresponding Evidence for each step. Use them with caution, since long evidence might \
-contain irrelevant information.
-
-{plan}
-
-Now solve the question or task according to the provided Evidence above. Respond with the answer \
-directly, with no extra words.
-
-Task: {task}
-Response:"""
-        plan = ""
-        for _plan, step_name, tool, tool_input in state["steps"]:
-            _results = (state["results"] or {}) if "results" in state else {}
-            for k, v in _results.items():
-                tool_input = tool_input.replace(k, v)
-                step_name = step_name.replace(k, v)
-            plan += f"Plan: {_plan}\n{step_name} = {tool}[{tool_input}]"
-        prompt = solve_prompt.format(plan=plan, task=state["task"])
-        result = self.model.invoke(prompt)
-        
-        return {"result": result.content, "message": messages_to_dict([result])}
+        try:
+            last_value = float(list(state["results"].values())[-1])
+            return {"result": last_value}
+        except (ValueError, IndexError):
+            result = "Error: Unable to retrieve the final result from the steps."
+            return {"result": result, "message": []}
     
     def _route(self, state):
         _step = self._get_current_task(state)

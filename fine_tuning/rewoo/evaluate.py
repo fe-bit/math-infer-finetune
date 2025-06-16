@@ -4,6 +4,32 @@ from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
 from math_datasets.evaluator import evaluate_all
 from pathlib import Path
 import argparse
+from rewoo_local import ReWOOLocalModel
+import time
+
+class ReWOOModelGenerate(Generate):
+    def __init__(self, rewoo_model: ReWOOLocalModel, sleep_time: int=5):
+        self.rewoo_model = rewoo_model
+        self.sleep_time = sleep_time
+
+    def generate(self, prompt, entry: dict[str, str]={}) -> str:
+        counter = 0
+        while True:
+            try:
+                time.sleep(self.sleep_time*0.5)
+                resp = self.rewoo_model(prompt)
+                entry["model_history"] = resp
+                return resp[-1]["solve"]["result"]
+            except Exception as e:
+                print(f"Error: {e}")
+                print(f"Retrying in {2*self.sleep_time} seconds...")
+                counter += 1
+                if counter > 1:
+                    entry["model_history"] = "Error occured."
+                    return "Error occured."
+                print("Counter:", counter)
+                time.sleep(2*self.sleep_time)
+
 
 def evaluate_one(generator: Generate, datasets: list[Dataset], model_name: str, save_dir: str, first_n: int=100, overwrite: bool=False):
     for dataset in datasets:
@@ -17,40 +43,43 @@ def evaluate_one(generator: Generate, datasets: list[Dataset], model_name: str, 
         )
 
     
-def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], checkpoint_dir: str, first_n: int=100, with_peft: bool=True):
+def evaluate(model_name: str, output_dir: str, datasets: list[Dataset], checkpoint_dir: str, first_n: int=100, with_peft: bool=True, resume_trained: bool=False):
     eval_name_before_training = model_name + "/before_training"
     eval_name_after_training = model_name + "/after_training"
 
+    llm = TransformersGenerate(TransformerLLM(model_name), max_new_tokens=1024)
     evaluate_one(
-        generator=TransformersGenerate(TransformerLLM(model_name)), 
+        generator=ReWOOModelGenerate(ReWOOLocalModel(llm=llm, with_examples=True), sleep_time=10), 
         datasets=datasets, 
         first_n=first_n, 
         model_name=eval_name_before_training, 
         save_dir=output_dir,
-        overwrite=False
+        overwrite=False,
     )
 
     if with_peft:
         llm = TransformerLLM(model_name=model_name)
         llm.merge_with_peft(checkpoint_dir)
+        generator = TransformersGenerate(llm, max_new_tokens=1024)
         evaluate_one(
-            generator=TransformersGenerate(model=llm),
+            generator=ReWOOModelGenerate(ReWOOLocalModel(llm=generator, with_examples=False), sleep_time=10), 
             datasets=datasets, 
             first_n=first_n, 
             model_name=eval_name_after_training,
             save_dir=output_dir,
-            overwrite=True
+            overwrite=resume_trained
         )
         del llm
     else:
         llm = TransformerLLM.from_trained(model_name=model_name, checkpoint_path=checkpoint_dir)
+        generator = TransformersGenerate(llm, max_new_tokens=1024)
         evaluate_one(
-            generator=TransformersGenerate(model=llm), 
+            generator=ReWOOModelGenerate(ReWOOLocalModel(llm=generator, with_examples=False), sleep_time=10), 
             datasets=datasets, 
             first_n=first_n, 
             model_name=eval_name_after_training, 
             save_dir=output_dir,
-            overwrite=True
+            overwrite=resume_trained
         )
         del llm
 
@@ -67,6 +96,8 @@ if __name__:
                        help="Number of samples to evaluate (default: 50)")
     parser.add_argument("--with-peft", action="store_true", default=False,
                        help="Whether to use PEFT for fine-tuning")
+    parser.add_argument("--resume", action="store_true", default=False,
+                       help="Whether to overwrite or resume the evaluation results for the trained model")
     args = parser.parse_args()
 
     SAVE_DIR = Path(__file__).parent
@@ -76,4 +107,4 @@ if __name__:
     print("Using model:", model_name)
     print("With Peft:", args.with_peft)
     datasets = [SVAMP, GSM8K]
-    evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=datasets, first_n=args.first_n, checkpoint_dir=output_dir.as_posix(), with_peft=args.with_peft)
+    evaluate(model_name=model_name, output_dir=SAVE_DIR.as_posix(), datasets=datasets, first_n=args.first_n, checkpoint_dir=output_dir.as_posix(), with_peft=args.with_peft, resume_trained=args.resume)

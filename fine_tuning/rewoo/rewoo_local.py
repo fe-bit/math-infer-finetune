@@ -22,7 +22,7 @@ class ReWOO(TypedDict):
     message: List
 
 class ReWOOLocalModel:
-    def __init__(self, llm: Generate, model_name="gemma-3-27b-it", temperature: float= 0.0):
+    def __init__(self, llm: Generate, model_name="gemma-3-27b-it", temperature: float= 0.0, with_examples: bool=True):
         self.model = ChatGoogleGenerativeAI(
             model=model_name,
             temperature=temperature,
@@ -43,7 +43,9 @@ Tools available:
 **Do not solve the problem directly. Only write the plan and tool inputs.**  
 Each step must follow this format:
 Plan: [describe the reasoning for the step] #EX = Tool[tool input]
-
+"""
+        if with_examples:
+            self.prompt += """\n
 Example:
 
 Task: Marco and his dad went strawberry picking. Marco's dad's strawberries weighed 11 pounds. If together their strawberries weighed 30 pounds, how much did Marco's strawberries weigh?  
@@ -51,7 +53,8 @@ Plan: Subtract the dad’s weight from the total to find Marco’s weight. #E1 =
 
 Task: Frank was reading through his favorite book. The book had 3 chapters, each with the same number of pages. It has a total of 594 pages. How many pages are in each chapter?  
 Plan: Divide the total number of pages by the number of chapters. #E1 = Calculator[594 / 3]
-
+"""
+        self.prompt += """\n
 ---
 
 Begin!  
@@ -110,7 +113,6 @@ Task: {task}"""
             except Exception as e:
                 result = f"Error: {e}"
         elif tool == "LLM":
-            print(tool_input)
             result = self.model.invoke(tool_input)
             _results[step_name] = str(result)
             return {"result": result.content, "message": messages_to_dict([result])}

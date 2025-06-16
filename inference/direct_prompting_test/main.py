@@ -13,8 +13,8 @@ SAVE_DIR = Path(__file__).parent.as_posix()
 
 
 GEMINI_MODELS = [
-    # "gemini-2.0-flash",
-    # "gemma-3-27b-it",
+    "gemini-2.0-flash",
+    "gemma-3-27b-it",
 ]
 
 TRANSFORMERS_MODELS = [
@@ -54,13 +54,13 @@ def generate_responses_for_transformer_models(datasets: List[Dataset], model_nam
 
 if __name__ == "__main__":
     datasets = [SVAMP, GSM8K]
-    first_n = None
+    first_n = 200
 
-    # print("Generating responses for Gemini models...")
-    # generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="test")
+    print("Generating responses for Gemini models...")
+    generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="test")
 
-    print("Generating responses for Transformers models...")
-    generate_responses_for_transformer_models(datasets, TRANSFORMERS_MODELS, first_n=first_n, dataset_split="test")
+    # print("Generating responses for Transformers models...")
+    # generate_responses_for_transformer_models(datasets, TRANSFORMERS_MODELS, first_n=first_n, dataset_split="test")
     
     # Evaluate all datasets
     df = evaluate_all(GEMINI_MODELS + TRANSFORMERS_MODELS, datasets, save_dir=SAVE_DIR, use_transformated_answers=False)

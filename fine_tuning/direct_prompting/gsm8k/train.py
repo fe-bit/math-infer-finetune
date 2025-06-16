@@ -4,8 +4,7 @@ import logging
 import sys
 from pathlib import Path
 from peft import LoraConfig
-from datasets import Dataset as HFDataset, load_dataset
-import pandas as pd
+from datasets import load_dataset
 import torch
 from trl import SFTTrainer, SFTConfig
 import argparse
@@ -98,13 +97,13 @@ training_args = SFTConfig(
         "device_map": device_map_strategy,
     },
     output_dir=output_dir.as_posix(),
-    num_train_epochs=3,
-    learning_rate=2e-6,
+    num_train_epochs=2,
+    learning_rate=5e-6,
     
     # memory specific settings
-    per_device_train_batch_size=1,    
+    per_device_train_batch_size=2,    
     per_device_eval_batch_size=1,   
-    gradient_accumulation_steps=8,
+    gradient_accumulation_steps=4,
     eval_accumulation_steps=1,
     
     gradient_checkpointing=True,                  
@@ -112,7 +111,7 @@ training_args = SFTConfig(
     # save settings
     save_strategy="steps",
     save_steps=200,
-    save_total_limit=2,
+    save_total_limit=5,
     logging_steps=50, 
     
     # evaluation settings
@@ -125,19 +124,23 @@ training_args = SFTConfig(
     dataset_text_field="text",
     
     max_grad_norm=1.0,
-    weight_decay=0.01,
+    weight_decay=0.05,
     warmup_ratio=0.1,
-    lr_scheduler_type="linear"
+    lr_scheduler_type="cosine"
 )
 
 peft_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
+    r=4,
+    lora_alpha=8,
+    lora_dropout=0.2,
     # target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
-    target_modules=["q_proj", "v_proj"],
-    modules_to_save=["lm_head", "embed_token"],
+    # target_modules=["q_proj", "v_proj"],
+    # target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    target_modules=["q_proj", "k_proj", "v_proj"],
+    # modules_to_save=["lm_head", "embed_token"],
     task_type="CAUSAL_LM",
+    bias="lora_only",
+    use_rslora=True,
 )
 
 trainer = SFTTrainer(
@@ -147,7 +150,7 @@ trainer = SFTTrainer(
     train_dataset=ds["train"],
     eval_dataset=ds["test"],
     callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
-    # compute_metrics=get_compute_metrics(tokenizer),
+    compute_metrics=get_compute_metrics(tokenizer)
 )
 
 if resume:
