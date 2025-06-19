@@ -1,0 +1,228 @@
+from typing import List, Any, Dict
+from typing_extensions import TypedDict
+from langchain_core.messages import AIMessage
+import re
+from langchain_core.prompts import ChatPromptTemplate
+from langgraph.graph import END, StateGraph, START
+from sympy import sympify
+from sympy.core.sympify import SympifyError
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.schema import messages_to_dict
+import time
+from math_datasets.fine_tuning.llm import LLM
+from math_datasets.generators import Generate
+
+class ReWOO(TypedDict):
+    task: str
+    plan_string: str
+    steps: List
+    results: dict
+    result: str
+    message: List
+
+class ReWOOLocalModel:
+    def __init__(self, llm: Generate, gemini_model_name="gemma-3-27b-it", with_examples: bool=True):
+        self.model = ChatGoogleGenerativeAI(
+            model=gemini_model_name,
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+        )
+        self.llm = llm
+
+        self.prompt = """For the following task, make a detailed step-by-step plan to solve the problem.  
+For each step, choose **one tool** to retrieve or calculate the necessary information.  
+The tool output should be stored in a variable like #E1, #E2, etc., which can be used in later steps.
+
+Tools available:
+(1) LLM[input]: A pretrained language model like yourself. Use this to reason through parts of the problem using general knowledge or logic. Input can be a natural language instruction.
+(2) Calculator[input]: Use this for basic arithmetic operations (e.g., addition, subtraction, multiplication, division). Input must be a valid math expression like "290 / 2".
+
+**Do not solve the problem directly. Only write the plan and tool inputs.**  
+Each step must follow this format:
+Plan: [describe the reasoning for the step] #EX = Tool[tool input]
+"""
+        if with_examples:
+            self.prompt += """\n
+Example:
+
+Task: Marco and his dad went strawberry picking. Marco's dad's strawberries weighed 11 pounds. If together their strawberries weighed 30 pounds, how much did Marco's strawberries weigh?  
+Plan: Subtract the dad’s weight from the total to find Marco’s weight. #E1 = Calculator[30 - 11]
+
+Task: Frank was reading through his favorite book. The book had 3 chapters, each with the same number of pages. It has a total of 594 pages. How many pages are in each chapter?  
+Plan: Divide the total number of pages by the number of chapters. #E1 = Calculator[594 / 3]
+"""
+        self.prompt += """\n
+---
+
+Begin!  
+Describe your plans with rich details. Each Plan must be followed by exactly one #E.
+
+Task: {task}"""
+    
+    def __call__(self, task: str, silent:bool=True) -> List[Dict[str, Any]]:
+        result = []
+        app = self.get_graph()
+        for s in app.stream({"task": task}):
+            if not silent:
+                print(s)
+                print("---")
+            result.append(s)
+        return result
+    
+    def call_planner(self, task: str, silent:bool=True):
+        result = []
+        app = self.get_plan_graph()
+        for s in app.stream({"task": task}):
+            if not silent:
+                print(s)
+                print("---")
+            result.append(s)
+        return result
+    
+    def call_solve_with_plan(self, state: ReWOO, silent:bool=True):
+        result = []
+        if len(state["steps"]) == 0:
+            return "Error occured: Invalid Plan. No steps to execute."
+        app = self.get_solve_graph()
+        for s in app.stream({"state": state}):
+            if not silent:
+                print(s)
+                print("---")
+            result.append(s)
+        return result
+
+    def get_plan(self, state: ReWOO):
+        task = state["task"]
+        entry = {}
+        result = self.llm.generate(prompt=self.prompt.format(task=task), entry=entry)
+        regex_pattern = r"Plan:\s*(.+)\s*(#E\d+)\s*=\s*(\w+)\s*\[([^\]]+)\]"
+        matches = re.findall(regex_pattern, result)
+        if len(matches) == 0:
+            # Early exit: set a flag or error message
+            return {
+                "steps": [],
+                "plan_string": result,
+                "usage_metadata": entry.get("usage_metadata", {}),
+                "result": "Error: Invalid Plan. No steps to execute."
+            }
+        return {"steps": matches, "plan_string": result, "usage_metadata": entry["usage_metadata"]}
+    
+    def _get_current_task(self, state: ReWOO):
+        if "results" not in state or state["results"] is None:
+            return 1
+        if len(state["results"]) == len(state["steps"]):
+            return None
+        else:
+            return len(state["results"]) + 1
+
+    def tool_execution(self, state: ReWOO):
+        """Worker node that executes the tools of a given plan."""
+        if len(state["steps"]) == 0:
+            return {"result": "Error: Invalid Plan. No steps to execute."}
+        
+        _step = self._get_current_task(state)
+        if _step is None:
+            return state  # No more steps
+
+        _, step_name, tool, tool_input = state["steps"][_step - 1]
+        _results = (state["results"] or {}) if "results" in state else {}
+        
+        for k, v in _results.items():
+            tool_input = tool_input.replace(k, v)
+        
+        if tool == "Calculator":
+            try:
+                expr = tool_input
+                for k, v in _results.items():
+                    # Remove '#' and ensure variables are strings or numbers
+                    expr = expr.replace(k, str(v))
+                    expr = expr.replace(k.lstrip('#'), str(v))
+                # Parse and evaluate safely
+                evaluated = sympify(expr).evalf()
+                result = str(evaluated)
+            except SympifyError as e:
+                result = f"SymPy Error: {e}"
+            except Exception as e:
+                result = f"Error: {e}"
+        elif tool == "LLM":
+            result = self.model.invoke(tool_input)
+            _results[step_name] = str(result)
+            return {"result": result.content, "message": messages_to_dict([result])}
+        else:
+            raise ValueError
+        _results[step_name] = str(result)
+        return {"results": _results}
+
+    def solve(self, state: ReWOO):
+        if state.get("result", "").startswith("Error: Invalid Plan"):
+            return {"result": state["result"]}
+        
+        solve_prompt = """Solve the following task or problem. To solve the problem, we have made a step-by-step Plan and \
+retrieved corresponding Evidence for each step. Use them with caution, since long evidence might \
+contain irrelevant information.
+
+{plan}
+
+Now solve the question or task according to the provided Evidence above. Respond with the answer \
+directly, with no extra words.
+
+Task: {task}
+Response:"""
+        plan = ""
+        for _plan, step_name, tool, tool_input in state["steps"]:
+            _results = (state["results"] or {}) if "results" in state else {}
+            for k, v in _results.items():
+                tool_input = tool_input.replace(k, v)
+                step_name = step_name.replace(k, v)
+            plan += f"Plan: {_plan}\n{step_name} = {tool}[{tool_input}]"
+        prompt = solve_prompt.format(plan=plan, task=state["task"])
+        result = self.model.invoke(prompt)
+        
+        return {"result": result.content, "message": messages_to_dict([result])}
+    
+    def _route(self, state):
+        # Stop immediately if error is set
+        if state.get("result", "").startswith("Error: Invalid Plan"):
+            return "solve"
+        if "steps" in state and len(state["steps"]) == 0:
+            return "solve"
+        _step = self._get_current_task(state)
+        if _step is None:
+            return "solve"
+        else:
+            return "tool"
+    
+    def get_graph(self):
+        graph = StateGraph(ReWOO)
+        graph.add_node("plan", self.get_plan)
+        graph.add_node("tool", self.tool_execution)
+        graph.add_node("solve", self.solve)
+        
+        graph.add_edge("plan", "tool")
+        graph.add_edge("solve", END)
+        graph.add_conditional_edges("tool", self._route)
+        graph.add_edge(START, "plan")
+        app = graph.compile()
+        return app
+    
+    def get_plan_graph(self):
+        """Get the graph for the plan generation."""
+        graph = StateGraph(ReWOO)
+        graph.add_node("plan", self.get_plan)
+        graph.add_edge(START, "plan")
+        graph.add_edge("plan", END)
+        return graph.compile()
+    
+    def get_solve_graph(self):
+        graph = StateGraph(ReWOO)
+        graph.add_node("tool", self.tool_execution)
+        graph.add_node("solve", self.solve)
+        
+        graph.add_edge(START, "tool")
+        graph.add_conditional_edges("tool", self._route)
+        graph.add_edge("solve", END)
+        
+        app = graph.compile()
+        return app

@@ -4,12 +4,13 @@ import logging
 import sys
 from pathlib import Path
 from peft import LoraConfig
-from datasets import Dataset as HFDataset, load_dataset
-import pandas as pd
+from datasets import load_dataset
 import torch
 from trl import SFTTrainer, SFTConfig
 import argparse
 from dotenv import load_dotenv
+from math_datasets.fine_tuning.metrics.compute_metrics import get_compute_metrics
+from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
 
 load_dotenv()
 
@@ -32,6 +33,11 @@ def parse_args():
         action="store_true",
         help="Resume training from the latest checkpoint.",
     )
+    parser.add_argument(
+        "--quantized",
+        action="store_true",
+        help="Use quantization for the model.",
+    )
     return parser.parse_args()
 
 args = parse_args()
@@ -46,7 +52,6 @@ print(f"Output directory: {output_dir}")
 print(f"Resume from checkpoint: {resume}")
 
 def get_dataset():
-    # return load_dataset("openai/gsm8k", "main")
     p = WORKING_DIR / "train_data.jsonl"
     ds = load_dataset("json", data_files=p.as_posix(), split="train")
     ds = ds.train_test_split(test_size=0.1, seed=42)
@@ -80,10 +85,15 @@ if torch.cuda.is_available():
     else:
         precision_str = "float16"
         print("Using float16 for training.")
+    quantization_config = TransformerLLM.get_quantization_config() if args.quantized else None
+
 elif torch.backends.mps.is_available():
     print("MPS (Metal Performance Shaders) is available! Using Apple Silicon GPU.")
     device_map_strategy = "mps"
     precision_str = "bfloat16"
+    quantization_config = None
+    if args.quantized:
+        print("Warning: Quantization is not supported on MPS. Using without quantization.")
 else:
     print("CUDA is not available. Using CPU.")
     num_threads = int(os.environ.get("SLURM_CPUS_PER_TASK", 1)) # Default to 1 if not in Slurm
@@ -91,48 +101,50 @@ else:
     print(f"PyTorch using {torch.get_num_threads()} CPU threads.")
     device_map_strategy = "cpu"
     precision_str = "float32"
-
+    quantization_config = None
+    if args.quantized:
+        print("Warning: Quantization is not supported on MPS. Using without quantization.")
+    
 training_args = SFTConfig(
     model_init_kwargs={
         "torch_dtype": precision_str,
-        "device_map": device_map_strategy,
+        "device_map": "auto",
+        "quantization_config": quantization_config, 
     },
-    output_dir=output_dir.as_posix(),
-    num_train_epochs=5,
-    learning_rate=5e-6,
-    
-    # memory specific settings
-    per_device_train_batch_size=1,    
-    per_device_eval_batch_size=1,   
-    gradient_accumulation_steps=8,
+    output_dir=output_dir.as_posix(),    
+    num_train_epochs=2,
+    learning_rate=2e-6,
+    per_device_train_batch_size=2,  # Safer for 8GB VRAM
+    gradient_accumulation_steps=4,
+    per_device_eval_batch_size=2,
     eval_accumulation_steps=1,
-    
-    gradient_checkpointing=True,                  
-
-    # save settings
+    gradient_checkpointing=True,
     save_strategy="steps",
-    save_steps=100,
-    save_total_limit=2,
-    logging_steps=50, 
-    
-    # evaluation settings
+    save_steps=200,
+    save_total_limit=5,
+    logging_steps=50,
     eval_strategy="steps",
-    eval_steps=100,
+    eval_steps=200,
     load_best_model_at_end=True,
     metric_for_best_model="eval_loss",
     greater_is_better=False,
-
     dataset_text_field="text",
     max_grad_norm=1.0,
+    weight_decay=0.05,
+    warmup_ratio=0.1,
+    lr_scheduler_type="cosine",
+    max_seq_length=256
 )
 
 peft_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    target_modules=["q_proj", "v_proj"],
-    modules_to_save=["lm_head", "embed_token"],
+    r=8,
+    lora_alpha=16,
+    lora_dropout=0.2,
+    target_modules=["q_proj", "k_proj", "v_proj"],
+    modules_to_save=["lm_head", "embed_tokens"],
     task_type="CAUSAL_LM",
+    bias="lora_only",
+    use_rslora=False,
 )
 
 trainer = SFTTrainer(
@@ -141,6 +153,8 @@ trainer = SFTTrainer(
     peft_config=peft_config,
     train_dataset=ds["train"],
     eval_dataset=ds["test"],
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+    compute_metrics=get_compute_metrics(tokenizer)
 )
 
 if resume:

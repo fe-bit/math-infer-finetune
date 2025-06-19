@@ -4,6 +4,8 @@ env/
 **/evaluations/
 *.csv
 *.xlsx
+*.jsonl
+*.json
 
 __pycache__/
 *.pyc

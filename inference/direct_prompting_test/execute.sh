@@ -5,7 +5,7 @@
 #SBATCH -e ./inference/direct_prompting_test/jobs/%x.%j.err
 #SBATCH -D ./
 #SBATCH --time=10:30:00
-#SBATCH --partition=NvidiaAll
+#SBATCH --partition=AMD
 #SBATCH --comment=""
 
 source env/bin/activate

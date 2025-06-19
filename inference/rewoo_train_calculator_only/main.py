@@ -4,18 +4,20 @@ from math_datasets.evaluator import evaluate_all
 from dotenv import load_dotenv
 from typing import List, Literal
 from pathlib import Path
-from math_datasets.generators import Generate, generate_responses
+from math_datasets.generators import Generate, generate_responses, TransformersGenerate
+from math_datasets.fine_tuning.llm import TransformerLLM
 import time
 from rewoo import ReWOOGeminiModel
+from rewoo_local import ReWOOLocalModel
 
 load_dotenv(override=True)
 
 SAVE_DIR = Path(__file__).parent.as_posix()
 
 GEMINI_MODELS = [
-    "gemini-2.0-flash",
+    "gemma-3-27b-it",
+    # "gemini-2.0-flash",
 ]
-
 
 class ReWOOGeminiModelGenerate(Generate):
     def __init__(self, rewoo_model: ReWOOGeminiModel, sleep_time: int=5):
@@ -32,14 +34,13 @@ class ReWOOGeminiModelGenerate(Generate):
                 return resp[-1]["solve"]["result"]
             except Exception as e:
                 print(f"Error: {e}")
-                t = 300
-                print(f"Retrying in {t + self.sleep_time} seconds...")
+                print(f"Retrying in {2*self.sleep_time} seconds...")
                 counter += 1
-                if counter > 5:
+                if counter > 1:
                     entry["model_history"] = "Error occured."
                     return "Error occured."
                 print("Counter:", counter)
-                time.sleep(t + self.sleep_time)
+                time.sleep(2*self.sleep_time)
 
 
 def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
@@ -48,7 +49,7 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
             generate_responses(
                 dataset, 
                 model_name=model_name, 
-                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=15), sleep_time=30), 
+                generator=ReWOOGeminiModelGenerate(ReWOOGeminiModel(model_name=model_name, sleep_time=1), sleep_time=2), 
                 save_dir=SAVE_DIR, 
                 first_n=first_n,
                 dataset_split=dataset_split
@@ -58,9 +59,9 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
 
 if __name__ == "__main__":
     datasets = [SVAMP, GSM8K]
-    first_n = 450
+    first_n = None
     
     generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="train")
-    
-    df = evaluate_all(GEMINI_MODELS, datasets, save_dir=SAVE_DIR, use_transformated_answers=False)
+
+    df = evaluate_all(GEMINI_MODELS, datasets, save_dir=SAVE_DIR, use_transformated_answers=False, use_first_n=first_n)
     print(df)

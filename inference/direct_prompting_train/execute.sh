@@ -8,5 +8,6 @@
 #SBATCH --partition=AMD
 #SBATCH --comment=""
 
+export PYTHONUNBUFFERED=1
 source env/bin/activate
 python3 inference/direct_prompting_train/main.py
