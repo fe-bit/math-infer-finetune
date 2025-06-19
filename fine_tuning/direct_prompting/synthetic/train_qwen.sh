@@ -12,11 +12,11 @@ export TMPDIR=$HOME/tmp
 mkdir -p $TMPDIR
 
 # Add aggressive memory optimization
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
-export CUDA_LAUNCH_BLOCKING=0
+# export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+# export CUDA_LAUNCH_BLOCKING=0
 export PYTHONUNBUFFERED=1
 
 source env/bin/activate
 
-python3 ./fine_tuning/direct_prompting/synthetic/train.py Qwen/Qwen2.5-0.5B-Instruct
+python3 ./fine_tuning/direct_prompting/synthetic/train_advanced.py Qwen/Qwen2.5-0.5B-Instruct
 python3 fine_tuning/direct_prompting/synthetic/evaluate.py --model-name Qwen/Qwen2.5-0.5B-Instruct --first-n 50 --with-peft
