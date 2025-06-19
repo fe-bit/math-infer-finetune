@@ -31,6 +31,11 @@ if __name__ == "__main__":
     # Evaluate all datasets
     df_gsm8k = evaluate_detail("gemma-3-27b-it", GSM8K, SAVE_DIR, use_transformated_answers=False)
     df_svamp = evaluate_detail("gemma-3-27b-it", SVAMP, SAVE_DIR, use_transformated_answers=False)
+    
+    # select 50 first entries in both dataframes for now
+    df_gsm8k = df_gsm8k.iloc[:50]
+    df_svamp = df_svamp.iloc[:50]
+
     df_gsm8k["dataset"] = datasets[0].name
     df_svamp["dataset"] = datasets[1].name
     df = pd.concat([df_gsm8k, df_svamp], ignore_index=True)
@@ -50,5 +55,5 @@ if __name__ == "__main__":
 
     df["messages"] = df.apply(format_chat, axis=1)
     df = df[["messages", "dataset"]]
-    p = Path(__file__).parent / "rewoo_train_data.jsonl"
+    p = Path(__file__).parent / "rewoo_test_data.jsonl"
     df.to_json(p.as_posix(), orient="records", lines=True)
