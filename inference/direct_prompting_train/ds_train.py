@@ -35,12 +35,13 @@ if __name__ == "__main__":
     
     df_train1 = get_training_data(GEMINI_MODELS[0], datasets[0], SAVE_DIR)
     df_train2 = get_training_data(GEMINI_MODELS[0], datasets[1], SAVE_DIR)
-
+    df_train1["dataset"] = datasets[0].name
+    df_train2["dataset"] = datasets[1].name
     df_train = pd.concat([df_train1, df_train2])
     # shuffle the training data
     df_train = df_train.sample(frac=1, random_state=42).reset_index(drop=True)
     df_train["messages"] = df_train.apply(format_chat, axis=1)
-    df_train = df_train[["messages"]]
+    df_train = df_train[["messages", "dataset"]]
     print(df_train.head())
     df_train.to_json(Path(SAVE_DIR) / "train_data.jsonl", orient="records", lines=True)
     df_train.to_excel(Path(SAVE_DIR) / "train_data.csv", index=False)
