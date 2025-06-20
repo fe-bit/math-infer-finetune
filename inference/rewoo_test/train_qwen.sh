@@ -17,5 +17,5 @@ lscpu
 
 source env/bin/activate
 
-python3 ./inference/rewoo_test/train.py Qwen/Qwen2.5-0.5B-Instruct --resume
+python3 ./inference/rewoo_test/train.py Qwen/Qwen2.5-0.5B-Instruct
 python3 inference/rewoo_test/main.py --model-name Qwen/Qwen2.5-0.5B-Instruct --first-n 50
