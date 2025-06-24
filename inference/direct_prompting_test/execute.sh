@@ -9,4 +9,4 @@
 #SBATCH --comment=""
 
 source env/bin/activate
-python3 inference/direct_prompting_test/main.py
+python inference/direct_prompting_test/main.py --first-n 100
