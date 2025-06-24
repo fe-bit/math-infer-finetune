@@ -21,6 +21,7 @@ GEMINI_MODELS = [
 TRANSFORMERS_MODELS = [
     "HuggingFaceTB/SmolLM2-360M-Instruct",
     "Qwen/Qwen2.5-0.5B-Instruct",
+    "emre/Qwen-0.5B-GRPO",
     # "Qwen/Qwen3-0.6B",
     # "HuggingFaceTB/SmolLM2-1.7B-Instruct",
 ]

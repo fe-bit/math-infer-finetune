@@ -4,8 +4,8 @@
 #SBATCH -o ./inference/rewoo_test/jobs/%x.%j.out
 #SBATCH -e ./inference/rewoo_test/jobs/%x.%j.err
 #SBATCH -D ./
-#SBATCH --time=5:30:00
-#SBATCH --partition=AMD
+#SBATCH --time=10:30:00
+#SBATCH --partition=NvidiaAll
 #SBATCH --comment=""
 
 export PYTHONUNBUFFERED=1

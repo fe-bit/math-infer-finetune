@@ -45,6 +45,11 @@ def parse_args():
         action="store_true",
         help="Use quantization for the model.",
     )
+    parser.add_argument(
+        "--use-verifier-loss",
+        action="store_true",
+        help="Use verifier loss during training.",
+    )
     return parser.parse_args()
 
 args = parse_args()
@@ -57,6 +62,7 @@ output_dir = WORKING_DIR / f"training-output/{model_name}"
 print(f"Using model: {model_name}")
 print(f"Output directory: {output_dir}")
 print(f"Resume from checkpoint: {resume}")
+print(f"Use Verifier Loss: {args.use_verifier_loss}")
 
 def get_dataset():
     p_train = WORKING_DIR / "rewoo_train_data.jsonl"
@@ -138,29 +144,28 @@ def get_compute_metrics(tokenizer, dataset):
             model=model,
             tokenizer=tokenizer
         )
-        chat_huggingface = ReWOOGenerate.get_chat_huggingface(llm=llm)
-        planner = PlanGenerator(model=chat_huggingface, sleep_time=0)
-        plan_executor = PlanExecutor()
+        # chat_huggingface = ReWOOGenerate.get_chat_huggingface(llm=llm)
+        # planner = PlanGenerator(model=chat_huggingface, sleep_time=0, with_examples=False)
+        # plan_executor = PlanExecutor()
+        generator = ReWOOGenerate.init_transformer_llm(llm=llm, with_examples=False)
         
         correct = {}
         plan_format_correct = {}
-        # Mark entire batch as failed
-        for sample in tqdm(dataset, desc="Evaluating ReWOO", total=len(dataset)):
-            plan = planner.generate_plan(task=sample["question"])
-            if len(plan) == 0:
-                correct.setdefault(sample["dataset"], []).append(False)
-                plan_format_correct.setdefault(sample["dataset"], []).append(False)
-            else:
-                try:
-                    resp = float(plan_executor.follow_plan(plan=plan)[-1]["solve"]["result"])
-                    is_correct = is_correct_answer(resp, Dataset.extract_answer(sample["answer"]))
-                    plan_format = True
-                except Exception as e:
-                    is_correct = False
-                    plan_format = False
+        for sample in tqdm(dataset, desc="Evaluating ReWOO"):
+            # plan = planner.generate_plan(sample["question"])
+            try:
+                entry = {}
+                resp = generator.generate(prompt=sample["question"], entry=entry)
+                float_answer = Dataset.extract_answer(resp)
+                
+                is_correct = is_correct_answer(float_answer, Dataset.extract_answer(sample["answer"]))
+                plan_format = True
+            except Exception as e:
+                is_correct = False
+                plan_format = False
 
-                correct.setdefault(sample["dataset"], []).append(is_correct)
-                plan_format_correct.setdefault(sample["dataset"], []).append(plan_format)
+            correct.setdefault(sample["dataset"], []).append(is_correct)
+            plan_format_correct.setdefault(sample["dataset"], []).append(plan_format)
 
         accuracies = {ds_name: float(np.mean(correct_list)) * 100 for ds_name, correct_list in correct.items()}      
         accuracies["avg_accuracy"] = float(np.mean(list(accuracies.values())))
@@ -225,10 +230,10 @@ class CustomSFTTrainer(SFTTrainer):
                     predicted_answers.append(0.0)
                 
             verifier_scores = torch.tensor(predicted_answers, device=lm_loss.device, dtype=torch.float32)
-            verifier_loss = (1.0 - verifier_scores).mean()  # Adds ~1.0 per incorrect solution, normalized by batch size
+            verifier_loss = (1.0 - verifier_scores).sum()  # Adds ~1.0 per incorrect solution, normalized by batch size
 
             # Combine losses with small alpha
-            loss = (1.0 - self.alpha) * lm_loss + self.alpha * verifier_loss
+            loss = lm_loss + verifier_loss
         return (loss, outputs) if return_outputs else loss
 
 training_args = SFTConfig(
@@ -238,7 +243,7 @@ training_args = SFTConfig(
         "quantization_config": quantization_config,
     },
     output_dir=output_dir.as_posix(),
-    num_train_epochs=2,
+    num_train_epochs=3,
     learning_rate=2e-5,
     per_device_train_batch_size=1,
     gradient_accumulation_steps=8,
@@ -247,7 +252,7 @@ training_args = SFTConfig(
     gradient_checkpointing=True,
     save_strategy="steps",
     save_steps=200, # TODO: Adjust based on dataset size
-    save_total_limit=3,
+    save_total_limit=2,
     logging_steps=50,
     eval_strategy="steps",
     eval_steps=200, # TODO: Adjust based on dataset size
@@ -257,35 +262,46 @@ training_args = SFTConfig(
     dataset_text_field="text",
     weight_decay=0.01,
     warmup_ratio=0.1,
-    lr_scheduler_type="cosine",
+    # lr_scheduler_type="cosine",
     max_seq_length=1024,
 )
 
 peft_config = LoraConfig(
-    r=4,
-    lora_alpha=8,
+    r=8,
+    lora_alpha=16,
     lora_dropout=0.05,
-    target_modules=["q_proj", "k_proj", "v_proj"],
+    target_modules="all-linear", #["q_proj", "k_proj", "v_proj"],
     # modules_to_save=["lm_head", "embed_tokens"],
     task_type="CAUSAL_LM",
     bias="lora_only",
-    use_rslora=True,
+    use_rslora=True, # Use RSLORA for better performance
 )
 
 trainer = CustomSFTTrainer(
     model_name=model_name,
     model_tokenizer=tokenizer,
     use_verifier=True,  # Set to True to enable verifier model
-    alpha=0.001,  # Adjust alpha as needed
+    alpha=0.1,
 
-    model=model_name,
-    args=training_args,
-    peft_config=peft_config,
-    train_dataset=ds["train"],
-    eval_dataset=ds["test"].select(range(45)),
-    # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
-    compute_metrics=get_compute_metrics(tokenizer, ds["test"]),
-)
+        model=model_name,
+        args=training_args,
+        peft_config=peft_config,
+        train_dataset=ds["train"],
+        eval_dataset=ds["test"].select(range(45)),
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        compute_metrics=get_compute_metrics(tokenizer, ds["test"]),
+    )
+else:
+    print("Using standard SFTTrainer without verifier loss.")
+    trainer = SFTTrainer(
+        model=model_name,
+        args=training_args,
+        peft_config=peft_config,
+        train_dataset=ds["train"],
+        eval_dataset=ds["test"].select(range(45)),
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        compute_metrics=get_compute_metrics(tokenizer, ds["test"]),
+    )
 
 if resume:
     trainer.train(resume_from_checkpoint=True)
