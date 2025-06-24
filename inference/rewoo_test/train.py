@@ -104,6 +104,12 @@ if torch.cuda.is_available():
         precision_str = "float16"
     from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
     quantization_config = TransformerLLM.get_quantization_config() if args.quantized else None
+elif torch.backends.mps.is_available():
+    device_map_strategy = "auto"
+    precision_str = "bfloat16"
+    
+    from math_datasets.fine_tuning.llm.transformer_llm import TransformerLLM
+    quantization_config = TransformerLLM.get_quantization_config() if args.quantized else None
 else:
     device_map_strategy = "cpu"
     precision_str = "float32"
@@ -138,15 +144,9 @@ def get_compute_metrics(tokenizer, dataset):
         
         correct = {}
         plan_format_correct = {}
-        questions = dataset["question"]
-
-        t0 = time.time()
-        plans = planner.generate_plan_batch(questions)
-        t1 = time.time()
-
-        logging.info(f"Generated plans in {t1 - t0:.2f} seconds for {len(plans)} questions.")
         # Mark entire batch as failed
-        for sample, plan in zip(dataset, plans):
+        for sample in tqdm(dataset, desc="Evaluating ReWOO", total=len(dataset)):
+            plan = planner.generate_plan(task=sample["question"])
             if len(plan) == 0:
                 correct.setdefault(sample["dataset"], []).append(False)
                 plan_format_correct.setdefault(sample["dataset"], []).append(False)
@@ -243,7 +243,7 @@ training_args = SFTConfig(
     per_device_train_batch_size=1,
     gradient_accumulation_steps=8,
     per_device_eval_batch_size=1,
-    eval_accumulation_steps=8,
+    eval_accumulation_steps=1,
     gradient_checkpointing=True,
     save_strategy="steps",
     save_steps=200, # TODO: Adjust based on dataset size
@@ -262,9 +262,9 @@ training_args = SFTConfig(
 )
 
 peft_config = LoraConfig(
-    r=8,
-    lora_alpha=16,
-    lora_dropout=0.1,
+    r=4,
+    lora_alpha=8,
+    lora_dropout=0.05,
     target_modules=["q_proj", "k_proj", "v_proj"],
     # modules_to_save=["lm_head", "embed_tokens"],
     task_type="CAUSAL_LM",
@@ -276,7 +276,7 @@ trainer = CustomSFTTrainer(
     model_name=model_name,
     model_tokenizer=tokenizer,
     use_verifier=True,  # Set to True to enable verifier model
-    alpha=0.1,  # Adjust alpha as needed
+    alpha=0.001,  # Adjust alpha as needed
 
     model=model_name,
     args=training_args,

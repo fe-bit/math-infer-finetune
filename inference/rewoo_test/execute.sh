@@ -10,4 +10,4 @@
 
 export PYTHONUNBUFFERED=1
 source env/bin/activate
-python3 inference/rewoo_test/main.py
+python inference/rewoo_test/main.py --first-n 100

@@ -18,5 +18,5 @@ export PYTHONUNBUFFERED=1
 
 source env/bin/activate
 
-python3 ./inference/rewoo_test/train.py HuggingFaceTB/SmolLM2-360M-Instruct
+python ./inference/rewoo_test/train.py HuggingFaceTB/SmolLM2-360M-Instruct
 python3 inference/rewoo_test/main.py --model-name HuggingFaceTB/SmolLM2-360M-Instruct --first-n 50
