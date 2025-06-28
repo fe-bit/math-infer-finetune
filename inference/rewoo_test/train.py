@@ -277,11 +277,12 @@ peft_config = LoraConfig(
     use_rslora=True, # Use RSLORA for better performance
 )
 
-trainer = CustomSFTTrainer(
-    model_name=model_name,
-    model_tokenizer=tokenizer,
-    use_verifier=True,  # Set to True to enable verifier model
-    alpha=0.1,
+if args.use_verifier_loss:
+    trainer = CustomSFTTrainer(
+        model_name=model_name,
+        model_tokenizer=tokenizer,
+        use_verifier=True,  # Set to True to enable verifier model
+        alpha=0.1,
 
         model=model_name,
         args=training_args,
