@@ -4,10 +4,8 @@ from math_datasets.evaluator import evaluate_all
 from dotenv import load_dotenv
 from typing import List, Literal
 from pathlib import Path
-from math_datasets.generators import generate_responses, ReWOOGenerate
-from math_datasets.fine_tuning.llm import TransformerLLM
+from math_datasets.generators import generate_responses
 import argparse
-import torch
 from math_datasets.generators.react import ReactGenerate
 from langchain_ollama import ChatOllama
 
@@ -18,13 +16,20 @@ load_dotenv(override=True)
 SAVE_DIR = Path(__file__).parent
 
 OLLAMA_MODELS = [
+    "smollm2:135m",
+    "smollm2:360m",
+    "qwen2.5:0.5b",
     "qwen3:0.6b",
-    "qwen3:1.7b",
-    # "deepseek-r1:1.5b",    
-    # "llama3.2:1b",
-    # "granite3.3:2b",
-    # "smollm2:1.7b",
 
+    "llama3.2:1b",
+    "gemma3:1b",
+    "granite3.1-moe:1b",
+
+    "qwen2-math:1.5b",
+    "qwen2.5:1.5b",
+    "deepseek-r1:1.5b",
+    "qwen3:1.7b",
+    "smollm2:1.7b",
 ]
     
 def get_ollama_model_name_identifer(model_name: str) -> str:
@@ -62,19 +67,13 @@ if __name__ == "__main__":
     first_n = args.first_n
     if args.model_name is None:
         generate_responses_for_ollama_models(datasets, OLLAMA_MODELS, first_n=first_n, dataset_split="test")
-        
         all_model_names = [get_ollama_model_name_identifer(model_name) for model_name in OLLAMA_MODELS]
         df = evaluate_all(all_model_names, datasets, save_dir=SAVE_DIR.as_posix(), use_transformated_answers=False, use_first_n=first_n)
         df.to_csv(SAVE_DIR / "react_evaluation.csv", index=False)
         print(df)
     else:
         models = [args.model_name]
-        generate_responses_for_local_models_before_fine_tuning(datasets, models, first_n=first_n, dataset_split="test")
-        generate_responses_for_local_models_after_fine_tuning(datasets, models, first_n=first_n, dataset_split="test", resume=args.resume)
-        
-        all_model_names = GEMINI_MODELS + \
-            [get_model_name_identifer(model_name, fine_tuned=False) for model_name in models] + \
-            [get_model_name_identifer(model_name, fine_tuned=True) for model_name in models] + \
-            [get_ollama_model_name_identifer(model_name) for model_name in OLLAMA_MODELS]
+        generate_responses_for_ollama_models(datasets, OLLAMA_MODELS, first_n=first_n, dataset_split="test")        
+        all_model_names = [get_ollama_model_name_identifer(model_name) for model_name in OLLAMA_MODELS]
         df = evaluate_all(all_model_names, datasets, save_dir=SAVE_DIR.as_posix(), use_transformated_answers=False)
         print(df)

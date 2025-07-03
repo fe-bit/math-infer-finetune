@@ -25,24 +25,20 @@ TRANSFORMER_MODELS = [
 ]
 
 OLLAMA_MODELS = [
+    "smollm2:135m",
+    "smollm2:360m",
+    "qwen2.5:0.5b",
     "qwen3:0.6b",
+
+    "llama3.2:1b",
+    "gemma3:1b",
+    "granite3.1-moe:1b",
+
+    "qwen2-math:1.5b",
+    "qwen2.5:1.5b",
+    "deepseek-r1:1.5b",
     "qwen3:1.7b",
-    # "qwen2.5-coder:0.5b",
-    # "qwen2.5:0.5b",
-    # "qwen2-math:1.5b",
-
-    # "deepseek-r1:1.5b",
-    
-    # "gemma3:1b",
-    
-    # "llama3.2:1b",
-    
-    # "granite3.3:2b",
-    # "tinyllama:1.1b",
-    # "smollm2:135m",
-    # "smollm2:360m",
-    # "smollm2:1.7b",
-
+    "smollm2:1.7b",
 ]
 
 def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
@@ -138,7 +134,7 @@ if __name__ == "__main__":
     first_n = args.first_n
     if args.model_name is None:
         # generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="test")
-        # generate_responses_for_ollama_models(datasets, OLLAMA_MODELS, first_n=first_n, dataset_split="test")
+        generate_responses_for_ollama_models(datasets, OLLAMA_MODELS, first_n=first_n, dataset_split="test")
         # generate_responses_for_local_models_before_fine_tuning(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="test")
         # generate_responses_for_local_models_after_fine_tuning(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="test")
         
