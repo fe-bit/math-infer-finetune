@@ -25,24 +25,18 @@ TRANSFORMER_MODELS = [
 ]
 
 OLLAMA_MODELS = [
-    # "qwen3:0.6b",
-    # "qwen3:1.7b",
-    # "qwen2.5-coder:0.5b",
-    # "qwen2.5:0.5b",
+    "smollm2:135m",
+    "smollm2:360m",
+    "qwen2.5:0.5b",
+    "qwen3:0.6b",
+    "llama3.2:1b",
+    "gemma3:1b",
+    "granite3.1-moe:1b",
     # "qwen2-math:1.5b",
-
+    # "qwen2.5:1.5b",
     # "deepseek-r1:1.5b",
-    
-    # "gemma3:1b",
-    
-    # "llama3.2:1b",
-    
-    # "granite3.3:2b",
-    # "tinyllama:1.1b",
-    # "smollm2:135m",
-    # "smollm2:360m",
+    # "qwen3:1.7b",
     # "smollm2:1.7b",
-
 ]
 
 def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
@@ -88,6 +82,7 @@ def generate_responses_for_ollama_models(datasets: List[Dataset], model_names: L
                 overwrite=False
             )
             dataset.clear_cache()
+        del generator
 
 
 def generate_responses_for_local_models_before_fine_tuning(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
@@ -111,7 +106,7 @@ def generate_responses_for_local_models_after_fine_tuning(datasets: List[Dataset
         llm = TransformerLLM(model_name, dtype=torch.bfloat16)
         llm.merge_with_peft(get_checkpoint_path(model_name=model_name).as_posix())
 
-        generator = ReWOOGenerate.init_transformer_llm(llm=llm)
+        generator = ReWOOGenerate.init_transformer_llm(llm=llm, with_examples=False)
         for dataset in datasets:
             generate_responses(
                 dataset, 
