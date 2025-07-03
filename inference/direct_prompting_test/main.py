@@ -21,7 +21,9 @@ GEMINI_MODELS = [
 ]
 
 TRANSFORMER_MODELS = [
-    # "Qwen/Qwen2.5-0.5B-Instruct",
+    "Qwen/Qwen2.5-0.5B-Instruct",
+    "Qwen/Qwen3-0.6B",
+    "HuggingFaceTB/SmolLM2-135M-Instruct",
 ]
 
 OLLAMA_MODELS = [
