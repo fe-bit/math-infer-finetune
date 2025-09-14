@@ -14,16 +14,19 @@ import os
 load_dotenv(override=True)
 
 SAVE_DIR = Path(__file__).parent
+RESULTS_DIR = Path(__file__).parent.parent.parent / "results" / "dp"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 GEMINI_MODELS = [
     # "gemini-2.0-flash",
-    # "gemma-3-27b-it",
+    "gemma-3-27b-it",
 ]
 
 TRANSFORMER_MODELS = [
-    "Qwen/Qwen2.5-0.5B-Instruct",
-    "Qwen/Qwen3-0.6B",
-    "HuggingFaceTB/SmolLM2-135M-Instruct",
+    # "Qwen/Qwen2.5-0.5B-Instruct",
+    # "Qwen/Qwen3-0.6B",
+    # "HuggingFaceTB/SmolLM2-135M-Instruct",
 ]
 
 OLLAMA_MODELS = [
@@ -31,16 +34,14 @@ OLLAMA_MODELS = [
     "smollm2:360m",
     "qwen2.5:0.5b",
     "qwen3:0.6b",
-
     "llama3.2:1b",
     "gemma3:1b",
-    "granite3.1-moe:1b",
-
     "qwen2-math:1.5b",
     "qwen2.5:1.5b",
     "deepseek-r1:1.5b",
     "qwen3:1.7b",
     "smollm2:1.7b",
+    # "qwen3:4b",
 ]
 
 def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
@@ -50,7 +51,7 @@ def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
         return model_name + "/before_training"
     
 def get_ollama_model_name_identifer(model_name: str) -> str:
-    return "ollama/" + model_name
+    return "ollama/" + model_name.replace(":", "_")
 
 
 def get_checkpoint_path(model_name: str) -> Path:
@@ -59,7 +60,7 @@ def get_checkpoint_path(model_name: str) -> Path:
 
 def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
     for model_name in model_names:
-        generator = GeminiGenerate(model_name=model_name)
+        generator = GeminiGenerate(model_name=model_name, wait_frequency=0)
         for dataset in datasets:
             generate_responses(
                 dataset, 
@@ -70,7 +71,10 @@ def generate_responses_for_gemini_models(datasets: List[Dataset], model_names: L
                 dataset_split=dataset_split,
                 overwrite=False
             )
-            dataset.clear_cache()
+            df = evaluate_detail(model_name, dataset=dataset, use_transformated_answers=False, additional_metrics=GeminiGenerate, save_dir=SAVE_DIR.as_posix(), use_first_n=first_n)
+            f = RESULTS_DIR / dataset.name / "google" / f"{model_name}.csv"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(f, index=False)
 
 def generate_responses_for_ollama_models(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
     for model_name in model_names:
@@ -85,7 +89,10 @@ def generate_responses_for_ollama_models(datasets: List[Dataset], model_names: L
                 dataset_split=dataset_split,
                 overwrite=False
             )
-            dataset.clear_cache()
+            df = evaluate_detail(get_ollama_model_name_identifer(model_name), dataset=dataset, use_transformated_answers=False, additional_metrics=OllamaGenerate, save_dir=SAVE_DIR.as_posix(), use_first_n=first_n)
+            f = RESULTS_DIR / dataset.name / f"{get_ollama_model_name_identifer(model_name)}.csv"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(f, index=False)
 
 
 def generate_responses_for_local_models_before_fine_tuning(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
@@ -102,6 +109,10 @@ def generate_responses_for_local_models_before_fine_tuning(datasets: List[Datase
                 dataset_split=dataset_split,
                 overwrite=False
             )
+            df = evaluate_detail(get_model_name_identifer(model_name, fine_tuned=False), dataset=dataset, use_transformated_answers=False, additional_metrics=TransformersGenerate, save_dir=SAVE_DIR.as_posix(), use_first_n=first_n)
+            f = RESULTS_DIR / dataset.name / f"{get_model_name_identifer(model_name, fine_tuned=False)}.csv"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(f, index=False)
             dataset.clear_cache()
 
 def generate_responses_for_local_models_after_fine_tuning(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test", resume: bool=False):
@@ -120,7 +131,28 @@ def generate_responses_for_local_models_after_fine_tuning(datasets: List[Dataset
                 dataset_split=dataset_split,
                 overwrite=not resume
             )
+            df = evaluate_detail(get_model_name_identifer(model_name, fine_tuned=True), dataset=dataset, use_transformated_answers=False, additional_metrics=TransformersGenerate, save_dir=SAVE_DIR.as_posix(), use_first_n=first_n)
+            f = RESULTS_DIR / dataset.name / f"{get_model_name_identifer(model_name, fine_tuned=True)}.csv"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(f, index=False)
             dataset.clear_cache()
+
+def main(first_n: int|None=None):
+    datasets = [SVAMP, GSM8K]
+    generate_responses_for_gemini_models(datasets, GEMINI_MODELS, first_n=first_n, dataset_split="test")
+    generate_responses_for_ollama_models(datasets, OLLAMA_MODELS, first_n=first_n, dataset_split="test")
+    # generate_responses_for_local_models_before_fine_tuning(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="test")
+    # generate_responses_for_local_models_after_fine_tuning(datasets, TRANSFORMER_MODELS, first_n=first_n, dataset_split="test")
+    
+    all_model_names = GEMINI_MODELS + \
+        [get_model_name_identifer(model_name, fine_tuned=False) for model_name in TRANSFORMER_MODELS] + \
+        [get_model_name_identifer(model_name, fine_tuned=True) for model_name in TRANSFORMER_MODELS] + \
+        [get_ollama_model_name_identifer(model_name) for model_name in OLLAMA_MODELS]
+    
+    df = evaluate_all(all_model_names, datasets, save_dir=SAVE_DIR.as_posix(), use_transformated_answers=False, use_first_n=first_n)
+    print(df)
+    df.to_csv(SAVE_DIR / "direct_prompting_evaluation.csv", index=False)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate model performance before and after training")

@@ -52,7 +52,7 @@ def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
         return model_name + "/before_training"
     
 def get_ollama_model_name_identifer(model_name: str) -> str:
-    return "ollama/" + model_name
+    return "ollama/" + model_name.replace(":", "_")
 
 
 def get_checkpoint_path(model_name: str) -> Path:

@@ -10,3 +10,8 @@ env/
 __pycache__/
 *.pyc
 **/training-output/
+
+**/*.DS_STORE
+**/.DS_STORE
+
+**/chroma_db/
