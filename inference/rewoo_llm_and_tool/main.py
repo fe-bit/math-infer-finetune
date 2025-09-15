@@ -19,7 +19,8 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 GEMINI_MODELS = [
     # "gemini-2.0-flash",
-    "gemma-3-27b-it",
+    
+    # "gemma-3-27b-it",
 ]
 
 TRANSFORMER_MODELS = [
@@ -29,7 +30,7 @@ TRANSFORMER_MODELS = [
 ]
 
 OLLAMA_MODELS = [
-    # "smollm2:135m",
+    "smollm2:135m",
     "smollm2:360m",
     "qwen2.5:0.5b",
     "qwen3:0.6b",

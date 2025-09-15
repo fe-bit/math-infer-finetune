@@ -20,7 +20,8 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 GEMINI_MODELS = [
     # "gemini-2.0-flash",
-    "gemma-3-27b-it",
+
+    # "gemma-3-27b-it",
 ]
 
 TRANSFORMER_MODELS = [

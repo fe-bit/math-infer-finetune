@@ -15,7 +15,7 @@ load_dotenv(override=True)
 SAVE_DIR = Path(__file__).parent.as_posix()
 
 GEMINI_MODELS = [
-    "gemma-3-27b-it",
+    # "gemma-3-27b-it",
     # "gemini-2.0-flash",
 ]
 
