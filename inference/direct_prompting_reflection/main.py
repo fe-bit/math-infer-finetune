@@ -4,14 +4,10 @@ from math_datasets.evaluator import evaluate_all, evaluate_detail
 from dotenv import load_dotenv
 from typing import List, Literal
 from pathlib import Path
-from math_datasets.generators import generate_responses, TransformersGenerate, GeminiGenerate, OllamaGenerate
-from math_datasets.fine_tuning.llm import TransformerLLM
+from math_datasets.generators import generate_responses, GeminiGenerate, OllamaGenerate
 import argparse
-import torch
 import os
 from math_datasets.generators.reflection import ReflectionGenerate
-from langchain_ollama import ChatOllama
-
 
 load_dotenv(override=True)
 

@@ -22,7 +22,7 @@ OLLAMA_MODELS = [
     "qwen3:0.6b",
     "llama3.2:1b",
     "qwen3:1.7b",
-    # "smollm2:1.7b",
+    "smollm2:1.7b",
 ]
     
 def get_ollama_model_name_identifer(model_name: str) -> str:

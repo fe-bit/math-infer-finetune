@@ -4,7 +4,7 @@ from math_datasets.evaluator import evaluate_all, evaluate_detail
 from dotenv import load_dotenv
 from typing import List, Literal
 from pathlib import Path
-from math_datasets.generators import generate_responses, TransformersGenerate, GeminiGenerate, OllamaGenerate
+from math_datasets.generators import generate_responses, GeminiGenerate, OllamaGenerate
 from math_datasets.fine_tuning.llm import TransformerLLM
 import argparse
 import torch
@@ -44,12 +44,6 @@ OLLAMA_MODELS = [
     # "smollm2:1.7b",
 
 ]
-
-def get_model_name_identifer(model_name: str, fine_tuned: bool) -> str:
-    if fine_tuned:
-        return model_name + "/after_training"
-    else:
-        return model_name + "/before_training"
     
 def get_ollama_model_name_identifer(model_name: str) -> str:
     return "ollama/" + model_name.replace(":", "_")
@@ -86,41 +80,6 @@ def generate_responses_for_ollama_models(datasets: List[Dataset], model_names: L
                 first_n=first_n,
                 dataset_split=dataset_split,
                 overwrite=False
-            )
-            dataset.clear_cache()
-
-
-def generate_responses_for_local_models_before_fine_tuning(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test"):
-    for model_name in model_names:
-        llm = TransformerLLM(model_name, dtype=torch.bfloat16)
-        generator = TransformersGenerate(model=llm)
-        for dataset in datasets:
-            generate_responses(
-                dataset, 
-                model_name=get_model_name_identifer(model_name, fine_tuned=False), 
-                generator=generator, 
-                save_dir=SAVE_DIR.as_posix(), 
-                first_n=first_n,
-                dataset_split=dataset_split,
-                overwrite=False
-            )
-            dataset.clear_cache()
-
-def generate_responses_for_local_models_after_fine_tuning(datasets: List[Dataset], model_names: List[str], first_n: int|None=None, dataset_split: Literal["test", "train"]="test", resume: bool=False):
-    for model_name in model_names:
-        llm = TransformerLLM(model_name, dtype=torch.bfloat16)
-        llm.merge_with_peft(get_checkpoint_path(model_name=model_name).as_posix())
-
-        generator = TransformersGenerate(model=llm)
-        for dataset in datasets:
-            generate_responses(
-                dataset, 
-                model_name=get_model_name_identifer(model_name=model_name, fine_tuned=True), 
-                generator=generator, 
-                save_dir=SAVE_DIR.as_posix(), 
-                first_n=first_n,
-                dataset_split=dataset_split,
-                overwrite=not resume
             )
             dataset.clear_cache()
 

@@ -29,7 +29,7 @@ def read_svamp_df(fpath, method):
         df_r = pd.read_excel(fpath, sheet_name="Error-Analysis", engine="openpyxl")
         df_r["Dataset"] = "SVAMP"
         df_r["Method"] = method
-        df_r["Model"] = Path(fpath).stem
+        df_r["Model"] = Path(fpath).stem.replace("_", ":")
         df_r = df_r[["Dataset", "ID", "Method", "Model", "question", "Question-only", "target_answer", "response", "is_correct", "input_tokens", "output_tokens", "total_tokens", "reasoning", "Error Class", "Type"]]
         return df_r
     except Exception as e:
@@ -43,7 +43,7 @@ def get_svamp_df(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = read_svamp_df(fpath, "Direktes Prompting")
             if df_r is not None:
@@ -54,7 +54,7 @@ def get_svamp_df(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = read_svamp_df(fpath, "DP-Reflection")
             if df_r is not None:
@@ -66,7 +66,7 @@ def get_svamp_df(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = read_svamp_df(fpath, "ReAct")
             if df_r is not None:
@@ -76,7 +76,7 @@ def get_svamp_df(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = read_svamp_df(fpath, "ReWOO")
             if df_r is not None:
@@ -117,7 +117,7 @@ def get_gsm8k(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = pd.read_excel(fpath, sheet_name="Error-Analysis", engine="openpyxl")
             df_r["Dataset"] = "GSM8K"
@@ -130,7 +130,7 @@ def get_gsm8k(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = pd.read_excel(fpath, sheet_name="Error-Analysis", engine="openpyxl")
             df_r["Dataset"] = "GSM8K"
@@ -143,7 +143,7 @@ def get_gsm8k(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             df_r = pd.read_excel(fpath, sheet_name="Error-Analysis", engine="openpyxl")
             df_r["Dataset"] = "GSM8K"
@@ -156,7 +156,7 @@ def get_gsm8k(include_misclassified: bool=False):
         for file in files:
             if not file.endswith(".xlsx"):
                 continue
-            print(file)
+            
             fpath = os.path.join(root, file)
             try:
                 df_r = pd.read_excel(fpath, sheet_name="Error-Analysis", engine="openpyxl")

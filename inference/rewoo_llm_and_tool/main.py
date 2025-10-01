@@ -31,15 +31,16 @@ TRANSFORMER_MODELS = [
 
 OLLAMA_MODELS = [
     "smollm2:135m",
-    "smollm2:360m",
-    "qwen2.5:0.5b",
-    "qwen3:0.6b",
-    "llama3.2:1b",
-    "gemma3:1b",
-    "qwen2-math:1.5b",
-    # "qwen2.5:1.5b",
-    "deepseek-r1:1.5b",
-    "qwen3:1.7b",
+    "gemma3:270m",
+    # "smollm2:360m",
+    # "qwen2.5:0.5b",
+    # "qwen3:0.6b",
+    # "llama3.2:1b",
+    # "gemma3:1b",
+    # "qwen2-math:1.5b",
+    # # "qwen2.5:1.5b",
+    # "deepseek-r1:1.5b",
+    # "qwen3:1.7b",
     # "smollm2:1.7b",
 ]
 
@@ -93,7 +94,8 @@ def generate_responses_for_ollama_models(datasets: List[Dataset], model_names: L
             df = evaluate_detail(get_ollama_model_name_identifer(model_name), dataset=dataset, use_transformated_answers=False, additional_metrics=ReWOOGenerate, save_dir=SAVE_DIR.as_posix(), use_first_n=first_n)
             f = RESULTS_DIR / dataset.name / f"{get_ollama_model_name_identifer(model_name).replace(":", "_")}.xlsx"
             f.parent.mkdir(parents=True, exist_ok=True)
-            df.to_excel(f, index=False, sheet_name="Original")
+            df["Error Class"] = None
+            df.to_excel(f, index=False, sheet_name="Error-Analysis")
         del generator
 
 
